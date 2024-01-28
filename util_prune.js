@@ -1,8 +1,8 @@
 const date = require('./util/date.js');
 const json = require('./util/json.js');
-const str = require('./util/str.js');
+const strtool = require('./util/strtool.js');
 const tool = require('./util/tool.js');
-const url = require('./util/url.js');
+const url = require('./util/urltool.js');
 const arr = require('./util/arr.js');
 const file = require('./util/file.js');
 const fpath = require('./util/fpath.js');
@@ -13,12 +13,13 @@ const conf = require('./util/conf.js');
 const log = require('./util/log.js');
 const winston = require('winston');
 const plattool = require('./util/plattool');
+const sysarg = require('./util/sysarg');
 
 module.exports = {
     toString: () => '[class UtilPrune]',
     date,
     json,
-    str,
+    strtool,
     arr,
     tool,
     url,
@@ -29,5 +30,6 @@ module.exports = {
     math:math_,
     conf:conf,
     plattool,
-    log
+    log,
+    sysarg
 };

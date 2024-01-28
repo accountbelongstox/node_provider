@@ -1,7 +1,7 @@
 
 'use strict';
 
-class Str {
+class StrTool {
 
     convertStyleValue(value) {
         value = value.trim().replace(';', '');
@@ -9,7 +9,7 @@ class Str {
     }
 
     convertStyleString(styleString) {
-        const propertys = styleString.split(':').map(s => s.trim(';'));// 将 styleString 拆分成多个样式属性
+        const propertys = styleString.split(':').map(s => s.trim(';'));
         propertys[0] = this.convertToCamelCase(propertys[0])
         propertys[1] = this.convertStyleValue(propertys[1]);
         return propertys
@@ -132,7 +132,6 @@ class Str {
         if (Buffer.isBuffer(data)) {
             return data.toString('utf-8');
         }
-
         if (typeof data === 'string' || typeof data === 'number') {
             let str = "" + data;
             str = str.replace(/\\/g, '/');
@@ -208,11 +207,9 @@ class Str {
     }
 
     findFirstNumberInString(str) {
-        // 将字符串按空格分割成数组
         const parts = str.split(/\s+/);
 
         for (const part of parts) {
-            // 使用正则表达式来查找数字
             const match = part.match(/\d/);
             if (match) {
                 return part;
@@ -221,20 +218,16 @@ class Str {
         return '0';
     }
 
-    // 将任何格式的数据转为二进制
     toBinary(data) {
         if (Buffer.isBuffer(data)) {
-            // 数据已经是二进制格式
             return data;
         } else if (typeof data === 'object') {
-            // 尝试序列化对象，失败则转文本再转二进制
             try {
                 return Buffer.from(JSON.stringify(data));
             } catch (e) {
                 return Buffer.from(String(data));
             }
         } else {
-            // 其他类型数据转换为字符串，再转换为二进制
             return Buffer.from(String(data));
         }
     }
@@ -243,30 +236,22 @@ class Str {
         return this.toString(data)
     }
 
-    // 将任何格式的数据转为数字
     toNumber(data) {
         if (Buffer.isBuffer(data)) {
-            // 二进制数据转文本后尝试转换为数字
             return this.extractNumber(data.toString('utf8'));
         } else if (typeof data === 'object') {
-            // 对象转换为数字1
             return 1;
         } else if (typeof data === 'boolean') {
-            // 布尔值true转为1，false转为0
             return data ? 1 : 0;
         } else if (typeof data === 'string') {
-            // 从字符串中提取数字
             return this.extractNumber(data);
         } else if (data instanceof Date) {
-            // 日期转换为时间戳
             return data.getTime();
         } else {
-            // 其他类型数据（假设是数字或类数字）直接返回
             return Number(data);
         }
     }
 
-    // 辅助函数，从字符串中提取数字
     extractNumber(str) {
         let result = str.match(/[+-]?([0-9]*[.])?[0-9]+/);
         return result ? (result[0].includes('.') ? parseFloat(result[0]) : parseInt(result[0])) : NaN;
@@ -276,6 +261,12 @@ class Str {
         return typeof value === 'string' || value instanceof String;
     }
 
+    extractHttpUrl(str) {
+        const regex = /(?:https?|ftp):\/\/[\w-]+(\.[\w-]+)+([\w.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?/;
+        const match = regex.exec(str);
+        return match ? match[0] : ``;
+    }
+
 }
 
-module.exports = new Str();
+module.exports = new StrTool();

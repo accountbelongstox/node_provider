@@ -86,6 +86,25 @@ class Env extends Base {
     }
   }
 
+  arrToDict(array) {
+    const result = {};
+    for (const item of array) {
+      if (Array.isArray(item) && item.length > 1) {
+        const [key, val] = item;
+        result[key] = val;
+      }
+    }
+    return result;
+  }
+
+  dictToArr(dictionary) {
+    const result = [];
+    for (const [key, value] of Object.entries(dictionary)) {
+      result.push([key, value]);
+    }
+    return result;
+  }
+
   readKey(key) {
     const content = fs.readFileSync(this.mainEnvFile, 'utf8');
     const lines = content.split('\n');
@@ -167,17 +186,17 @@ class Env extends Base {
     const val = this.getEnv(key, filePath);
     if (val === "") {
       if (isArg) {
-        console.log("False");
+        console.log(false);
       }
       return false;
     }
     if (isArg) {
-      console.log("True");
+      console.log(true);
     }
     return true;
   }
 
-  getEnv(key, filePath = null) {
+  getEnv(key, default_val = ``, filePath = null) {
     if (filePath === null) {
       filePath = this.localEnvFile;
     }
@@ -187,7 +206,7 @@ class Env extends Base {
         return subArr[1];
       }
     }
-    return "";
+    return default_val;
   }
 
   async saveFile(filePath, content, overwrite) {
@@ -197,4 +216,4 @@ class Env extends Base {
   }
 }
 
-module.exports = Env;
+module.exports = new Env();

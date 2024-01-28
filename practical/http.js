@@ -10,8 +10,9 @@ const express = require('express');
 const expressWs = require('express-ws');
 const {
     file,
-    str,
+    strtool,
     tool,
+    urltool
 } = require('../util.js');
 const encyclopedia = require('../model/encyclopedia.js').getEncyclopedia();
 
@@ -418,7 +419,7 @@ class httpWidget {
 
     openServerUrl(openUrl) {
         if (!openUrl) openUrl = this.getServerUrl()
-        openUrl = url.toOpenUrl(openUrl)
+        openUrl = urltool.toOpenUrl(openUrl)
         try{
             const { shell } = require('electron');
             shell.openExternal(openUrl);
@@ -639,7 +640,6 @@ class httpWidget {
         return null;
     }
 
-
     setWSClientWebsocketById(wsCId, ws) {
         this.getClienWebcketsData[wsCId] = ws
     }
@@ -714,7 +714,7 @@ class httpWidget {
             main_class = recieve_parse[0]
             recieve_on = recieve_parse[1]
         }
-        let send_id = `send_to_view_` + str.create_id()
+        let send_id = `send_to_view_` + strtool.create_id()
         data.main_class = main_class
         data.recieve_on = recieve_on
         data.send_id = send_id

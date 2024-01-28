@@ -1,6 +1,6 @@
 const { execSync, spawn, exec } = require('child_process');
 const fs = require('fs');
-// const path = require('path');
+const path = require('path');
 const Base = require('../base/base');
 
 class Plattools extends Base {
@@ -165,6 +165,57 @@ class Plattools extends Base {
             process.chdir(this.initialWorkingDirectory);
         }
         return resultText;
+    }
+
+
+    async spawnAsync(command, info = false, cwd = null) {
+        return new Promise((resolve, reject) => {
+            const childProcess = spawn(command, [], {
+                shell: true,
+                cwd: cwd,
+                stdio: info ? 'inherit' : 'pipe'
+            });
+            childProcess.on('exit', (code) => {
+                if (code === 0) {
+                    resolve();
+                } else {
+                    reject(new Error(`Command ${command} exited with code ${code}`));
+                }
+            });
+            if (!info) {
+                let output = '';
+                childProcess.stdout.on('data', (data) => {
+                    output += data;
+                });
+
+                childProcess.on('close', (code) => {
+                    if (code === 0) {
+                        resolve(output);
+                    } else {
+                        reject(new Error(`Command ${command} exited with code ${code}`));
+                    }
+                });
+            }
+        });
+    }
+
+    async execByExplorer(command, info = false, cwd = null) {
+        let cmd;
+        const parsedPath = path.parse(command);
+
+        if (parsedPath.root !== '' && parsedPath.dir !== '') {
+            // 如果是文件路径，则在命令中加入双引号
+            cmd = `explorer "${command}"`;
+        } else {
+            cmd = `explorer ${command}`;
+        }
+
+        return await this.spawnAsync(cmd, info, cwd);
+    }
+
+    async execByCommand(command, info = false, cwd = null) {
+        const cmd = `cmd /c ${command}`;
+        return await this.spawnAsync(cmd, info, cwd);
     }
 
     isCommand(command) {
