@@ -13,7 +13,7 @@ const {
     strtool,
     tool,
     urltool
-} = require('../util.js');
+} = require('../utils.js');
 const encyclopedia = require('../model/encyclopedia.js').getEncyclopedia();
 
 let debug_send_event = false

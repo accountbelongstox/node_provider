@@ -4,9 +4,9 @@ const os = require('os');
 const path = require('path');
 
 class setEnv {
-    regType = `REG_SZ`
+    regType = ``
     constructor() {
-        this.currentPath = this.getCurrentPath();
+		this.regType = this.queryEnvironmentVariable()
     }
 
     getBackupTmpDir() {
@@ -64,9 +64,26 @@ class setEnv {
         return `${year}${month}${day}_${hour}${minute}${second}`;
     }
 
+    queryEnvironmentVariable() {
+        try {
+            const command = 'reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v Path';
+            const result = execSync(command).toString();
+            const queryTable = result.split(/\s+/);
+            queryTable.splice(0, 3);
+            const underscoreVariable = queryTable.find(item => item.includes('_'));
+            if (!underscoreVariable) {
+                throw new Error('Environment variable "Path" is empty');
+            }
+            return underscoreVariable;
+        } catch (error) {
+            throw new Error(`Error querying environment variable: ${error.message}`);
+        }
+    }
+
     getCurrentPath() {
-        const result = execSync('reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v Path').toString();
-        const PathsMatch = result.split(new RegExp(`${this.regType}\\s+`))
+		const reg_command = `reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v Path`
+        const result = execSync(reg_command).toString();
+		const PathsMatch = result.split(this.regType)
         const Paths = PathsMatch[1].trim()
         const cleanedPaths = Paths.split(/;+/).filter(path => path.trim() !== '').map(path => path.trim());
         const formattedPaths = cleanedPaths.map(p => this.normalizeWinPath(p));

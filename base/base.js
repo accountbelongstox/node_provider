@@ -10,7 +10,10 @@ class Base extends Log {
     getCwd(filename = null, suffix = "") {
         let cwd;
         if (filename === null) {
-            const mainFilePath = path.resolve(process.argv[1]);
+            let mainFilePath = path.resolve(process.argv[1]);
+            if (fs.existsSync(mainFilePath) && fs.statSync(mainFilePath).isFile()) {
+                mainFilePath = path.dirname(mainFilePath)
+            }
             cwd = mainFilePath;
         } else {
             cwd = path.dirname(filename);

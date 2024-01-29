@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { promisify } = require('util');
-const { file } = require('../util_prune');
+const { file } = require('../utils_prune');
 const Base = require('../base/base');
 
 const readFileAsync = promisify(fs.readFile);
@@ -19,6 +19,7 @@ class Env extends Base {
     } else {
       rootDir = file.resolvePath(rootDir);
     }
+    console.log(`rootDir`,rootDir)
     this.setRootDir(rootDir, envName, delimiter);
   }
 

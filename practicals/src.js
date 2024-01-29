@@ -3,7 +3,7 @@ const os = require('os');
 // const edgedriver = require('edgedriver');
 const decompress = require('decompress');
 const winreg = require('winreg');
-const Util = require('../util');
+const Util = require('../utils');
 let config = {}
 
 class Source  {
