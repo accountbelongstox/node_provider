@@ -1,6 +1,6 @@
 const { execSync, spawn, exec } = require('child_process');
 const fs = require('fs');
-// const path = require('path');
+const path = require('path');
 const Base = require('../base/base');
 
 class Plattools extends Base {
@@ -131,6 +131,10 @@ class Plattools extends Base {
             error,
             code
         }
+    }
+
+    async cmdAsync(command, info = true, cwd = null, logname = null) {
+        return await this.execCmd(command, info, cwd, logname)
     }
 
     cmdSync(command, info = true, cwd = null, logname = null) {
