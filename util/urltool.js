@@ -1,10 +1,10 @@
 
 'use strict';
-const os = require('os');
-const url = require('url');
-const path = require('path');
+// const os = require('os');
+// const url = require('url');
+// const path = require('path');
 
-class Url {
+class UrlTool {
     isDynamicUrl(url) {
         if (url.includes('?')) {
             return true;
@@ -82,6 +82,17 @@ class Url {
             return false
         }
         return true
+    }
+    toOpenUrl(urlString) {
+        const parsedUrl = new URL(urlString);
+        const protocol = parsedUrl.protocol;
+        let hostname = parsedUrl.hostname;
+        const port = parsedUrl.port;
+        if (hostname === '0.0.0.0') {
+            hostname = `127.0.0.1`;
+        }
+        const newUrl = `${protocol}//${hostname}:${port}`;
+        return newUrl;
     }
 
     equalDomainFull(url1, url2) {
@@ -180,7 +191,12 @@ class Url {
         return joinedUrl;
     }
 
+    extractHttpUrl(str) {
+        const regex = /(?:https?|ftp):\/\/[\w-]+(\.[\w-]+)+([\w.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?/;
+        const match = regex.exec(str);
+        return match ? match[0] : null;
+    }
 }
 
-Url.toString = () => '[class Url]';
-module.exports = new Url();
+UrlTool.toString = () => '[class Url]';
+module.exports = new UrlTool();

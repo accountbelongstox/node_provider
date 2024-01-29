@@ -23,14 +23,13 @@ class File extends Base {
         return this.findRootDirectory(path.resolve(__dirname))
     }
 
-    resolvePath(path, relativePath = null, resolve = true) {
+    resolvePath(fpath, relativePath = null, resolve = true) {
         if (!resolve) {
             return path;
         }
-
-        if (!path.isAbsolute(path)) {
-            if (fs.existsSync(path)) {
-                return path.resolve(path);
+        if (!this.isAbsolute(fpath)) {
+            if (fs.existsSync(fpath)) {
+                return path.resolve(fpath);
             }
 
             let rootPath = this.getCwd();
@@ -38,10 +37,10 @@ class File extends Base {
                 rootPath = path.join(rootPath, relativePath);
             }
 
-            path = path.join(rootPath, path);
+            fpath = path.join(rootPath, fpath);
         }
 
-        return path;
+        return fpath;
     }
 
 

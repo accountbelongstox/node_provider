@@ -1,8 +1,8 @@
 const date = require('./util/date.js');
 const json = require('./util/json.js');
-const str = require('./util/str.js');
+const strtool = require('./util/strtool.js');
 const tool = require('./util/tool.js');
-const url = require('./util/url.js');
+const urltool = require('./util/urltool.js');
 const arr = require('./util/arr.js');
 const file = require('./util/file.js');
 const fpath = require('./util/fpath.js');
@@ -12,15 +12,18 @@ const math_ = require('./util/math.js');
 const conf = require('./util/conf.js');
 const log = require('./util/log.js');
 const plattool = require('./util/plattool');
+const sysarg = require('./util/sysarg');
+const setenv = require('./util/setenv.js');
+
 
 module.exports = {
     toString: () => '[class Util]',
     date,
     json,
-    str,
+    strtool,
     arr,
     tool,
-    url,
+    urltool,
     file,
     fpath,
     platform,
@@ -28,5 +31,7 @@ module.exports = {
     math:math_,
     conf:conf,
     plattool,
-    log
+    log,
+    sysarg,
+    setenv,
 };

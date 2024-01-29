@@ -7,13 +7,13 @@ class Base extends Log {
         super()
     }
 
-    getCwd(file = null, suffix = "") {
+    getCwd(filename = null, suffix = "") {
         let cwd;
-        if (file === null) {
+        if (filename === null) {
             const mainFilePath = path.resolve(process.argv[1]);
-            cwd = path.dirname(mainFilePath);
+            cwd = mainFilePath;
         } else {
-            cwd = path.dirname(file);
+            cwd = path.dirname(filename);
         }
         if (suffix !== "") {
             cwd = path.join(cwd, suffix);
