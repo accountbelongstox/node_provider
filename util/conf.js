@@ -13,6 +13,15 @@ class Conf {
         this.config = this.load()
     }
 
+    //#完成该方法
+    getValue(name,default_configname){
+
+    }
+    //#完成该方法
+    setValue(name,key,default_configname){
+
+    }
+
     load(file) {
         if (!file) file = this.JSONCONFFile;
         if (!fs.existsSync(file)) {

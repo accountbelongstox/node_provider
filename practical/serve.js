@@ -1,16 +1,16 @@
 const path = require('path');
 const fs = require('fs');
-const Conf = require('../util/conf');
+const conf = require('../util/conf');
 const { app } = require('../electron');
 const { execSync } = require('child_process');
-const remoteUrl = Conf.getValue('remoteUrl')
-const expressPort = remoteUrl.url.match(/:(\d+)/);
-const port = parseInt(expressPort[1], 10);
+// const remoteUrl = conf.getValue('remoteUrl')
+// const expressPort = remoteUrl.url.match(/:(\d+)/);
+// const port = parseInt(expressPort[1], 10);
 const net = require('net');
-const appRoot = path.resolve(app.getAppPath());
-const mainServer = Conf.getValue('mainServer')
-const indexDir = "." + path.dirname(mainServer.indexPath)
-const distDir = path.join(appRoot, indexDir)
+// const appRoot = path.resolve(app.getAppPath());
+// const mainServer = conf.getValue('mainServer')
+// const indexDir = "." + path.dirname(mainServer.indexPath)
+// const distDir = path.join(appRoot, indexDir)
 const http = require('http');
 
 const { strtool, urltool, file,plattool, setenv } = require('../utils');
