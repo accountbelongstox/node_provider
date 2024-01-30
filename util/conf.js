@@ -126,17 +126,23 @@ class Conf {
         }
     }
 
-    getValueByHierarchy(keys) {
+    getValueByHierarchy(keys, defaultValue = null) {
         let current = this.config;
-        for (const key of keys) {
-            if (current.hasOwnProperty(key)) {
-                current = current[key];
-            } else {
-                return null;
+        try {
+            for (const key of keys) {
+                if (current.hasOwnProperty(key)) {
+                    current = current[key];
+                } else {
+                    throw new Error(`Key ${key} not found in hierarchy`);
+                }
             }
+            return current;
+        } catch (error) {
+            console.error(`Error while getting value by hierarchy: ${error.message}`);
+            return defaultValue;
         }
-        return current;
     }
+    
 
     getConfigObject() {
         return { config: this.config };

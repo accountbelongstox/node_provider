@@ -1,7 +1,7 @@
 const path = require('path');
 const fs = require('fs');
-const Conf = require('ee-core/config');
-const { app } = require('electron');
+const Conf = require('../util/conf');
+const { app } = require('../electron');
 const { execSync } = require('child_process');
 const remoteUrl = Conf.getValue('remoteUrl')
 const expressPort = remoteUrl.url.match(/:(\d+)/);
