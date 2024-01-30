@@ -216,24 +216,27 @@ class Env {
 const env = new Env()
 
 class AutoInstaller {
-    projects = ['.', 'frontend'];
+    projects = ['.'];
     projectsFullDirs = [];
     dependesDirs = ['node_provider', 'node_spider'];
     dependesFullDirs = [];
+    public_skip_dirs = ['node_modules'];
     dependesPaths = [];
     currentDirectory = path.dirname(__filename);
     constructor() {
         this.scanFrontends()
+        this.projects.push(env.getEnv(`FRONTEND`))
     }
 
     scanDependes() {
         this.dependesDirs.forEach(project => {
-            const dirToScan = path.join(`.`, project);
-            this.scanDirectoryRecursive(dirToScan);
+            this.scanDirectoryRecursive(path.join(this.currentDirectory,`.`));
         });
         this.projects.forEach(project => {
-            const dirToScan = path.join(`.`, project);
-            this.projectsFullDirs.push(dirToScan);
+            const dirToScan = path.join(this.currentDirectory, project);
+            if (!this.projectsFullDirs.includes(dirToScan)) {
+                this.projectsFullDirs.push(dirToScan);
+            }
         });
     }
 
@@ -241,10 +244,15 @@ class AutoInstaller {
         if (fs.existsSync(directory)) {
             const files = fs.readdirSync(directory);
             files.forEach(file => {
+                if (this.public_skip_dirs.includes(file)) {
+                    return
+                }
                 const filePath = path.join(directory, file);
                 if (fs.statSync(filePath).isDirectory()) {
                     if (this.dependesDirs.includes(file)) {
-                        this.dependesFullDirs.push(filePath);
+                        if (!this.dependesFullDirs.includes(filePath)) {
+                            this.dependesFullDirs.push(filePath);
+                        }
                     }
                     this.scanDirectoryRecursive(filePath);
                 }
@@ -262,7 +270,7 @@ class AutoInstaller {
     getArgName(name, default_val = null) {
         const arg = this.getArgumentValue(name);
         if (arg) {
-            if(typeof arg == "string"){
+            if (typeof arg == "string") {
                 return path.normalize(arg);
             }
             return arg;
@@ -325,7 +333,7 @@ class AutoInstaller {
     getArgumentValue(arg_name) {
         const args = this.getSystemArguments();
         for (const arg of args) {
-            if(arg == arg_name){
+            if (arg == arg_name) {
                 return true;
             }
             const [name, value] = arg.split(/=/);
@@ -351,16 +359,22 @@ class AutoInstaller {
     }
     runInstallInDirectories(callback) {
         this.scanDependes()
+        // console.log(`this.dependesFullDirs`, this.dependesFullDirs)
+        // console.log(`this.projectsFullDirs`, this.projectsFullDirs)
         const yarn = this.getArgName("yarn", "yarn");
         const dependesPaths = this.dependesFullDirs;
         const git = this.getArgName("git", "git");
         for (const directory of dependesPaths) {
-            if (this.isEmptyDir(directory)) {
+            if (fs.existsSync(directory)) {
+                if (this.isEmptyDir(directory)) {
+                    this.deleteDirectory(directory)
+                }
+            }
+            if (!fs.existsSync(directory)) {
                 const basename = path.basename(directory)
                 const baseDir = path.dirname(directory)
                 const env_key = basename.toUpperCase()
                 process.chdir(baseDir);
-                this.deleteDirectory(directory)
                 const gitUrl = env.getEnv(env_key)
                 const gitCmd = `${git} clone ${gitUrl}`
                 execSync(gitCmd, { stdio: 'inherit' });
@@ -374,7 +388,7 @@ class AutoInstaller {
             }
         }
         const npm = this.getArgName("npm", `npm`)
-        this.yarn = yarn
+        this.start_exec = yarn
         this.npm = npm
         this.git = git
     }
@@ -385,9 +399,9 @@ class AutoInstaller {
         this.start_command = start_command
     }
     setStartFile(start_file) {
-        if(start_file){
-            if(!path.isAbsolute(start_file)){
-                start_file = path.join(this.currentDirectory,start_file)
+        if (start_file) {
+            if (!path.isAbsolute(start_file)) {
+                start_file = path.join(this.currentDirectory, start_file)
             }
         }
         this.start_file = start_file
@@ -397,8 +411,8 @@ class AutoInstaller {
     }
     startBy() {
         process.chdir(this.currentDirectory)
-        if(!this.start_command){
-            if(this.start_file){
+        if (!this.start_command) {
+            if (this.start_file) {
                 this.start_command = this.start_file
             }
         }
@@ -407,8 +421,22 @@ class AutoInstaller {
         execSync(startCmd, { shell: true, stdio: 'inherit' });
     }
 }
-//** ----------- Start ----------- */
-// const express_bind = require('./manager/express/express_bind');
-// const cluster = require('./manager/cluster');
-// express_bind.start(3099);
-// cluster.initApps();
+const auto = new AutoInstaller()
+let cmd_start = auto.getArgName("cmd_start", ``)
+console.log(`cmd_start ${cmd_start}`);
+if (cmd_start) {
+    auto.runInstallInDirectories()
+    //auto.setStartExe(`yarn`)
+    auto.setStartCommand(`reload`)
+    auto.setStartFile(``)
+    let parameter = auto.getArgName("restart", `restart`)
+    parameter = parameter ? `restart:${parameter}` : ""
+    auto.setStartParameter(parameter)
+    auto.startBy()
+} else {
+
+    //** ----------- Yarn Start ----------- */
+    // const { ElectronEgg } = require('ee-core');
+    // new ElectronEgg("module");
+
+}

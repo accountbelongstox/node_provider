@@ -7,7 +7,7 @@ const path = require('path');
 const regedit = require('regedit').promisified;
 const { execSync, exec } = require('child_process');
 let config = {};
-const { file, tool, str } = require('../util');
+const { file, tool, strtool } = require('../utils');
 
 class Win {
     pathKey = 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment'
@@ -73,7 +73,7 @@ class Win {
     getWslDistributes(callback) {
         let cmd = 'wsl -l --quiet'
         tool.exec_cmd(cmd, (stdout, error) => {
-            stdout = str.trim(stdout)
+            stdout = strtool.trim(stdout)
             let distros = stdout.split(/\s+/)
             distros = distros.map(str => str.replace(/\x00/g, "")).filter(str => str != "");
             callback(distros);
@@ -139,9 +139,9 @@ class Win {
     getDefaultEnvVersion() {
         let default_version = []
 
-        let default_python = str.getDefault(config.default_python, '3.10');
-        let default_java = str.getDefault(config.default_java, '9');
-        let default_node = str.getDefault(config.default_node, '18');
+        let default_python = strtool.getDefault(config.default_python, '3.10');
+        let default_java = strtool.getDefault(config.default_java, '9');
+        let default_node = strtool.getDefault(config.default_node, '18');
         let local_envdir = config.local_envdir
 
         default_python = default_python.replace(/\./g, '')

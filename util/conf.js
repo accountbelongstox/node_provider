@@ -4,11 +4,12 @@ const path = require('path');
 const crypto = require('crypto');
 
 class Conf {
-    constructor(config_name="default",config_sapce="configuration") {
-        this.userDataDir = path.join(os.homedir(), 'userData');
-        this.confDir = path.join(config_sapce, 'userData');
+    constructor(config_name="mainconf",config_sapce="dd_electron_userdata") {
+        const localAppDataPath = path.join(os.homedir(), 'AppData', 'Local');
+        this.userDataDir = path.join(localAppDataPath, config_sapce);
+        # 不存在则创建 this.userDataDir
         this.prefix = 'temp_conf_';
-        this.JSONCONFFile = path.join(this.confDir, `${config_name}.json`);
+        this.JSONCONFFile = path.join(this.userDataDir, `${config_name}.json`);
         this.config = this.load()
     }
 
@@ -101,7 +102,7 @@ class Conf {
             console.log('Config file created:', this.JSONCONFFile);
             return this.JSONCONFFile;
         } catch (error) {
-            console.error('Unable to create config file:', error.message);
+            console.error(`Unable to create config file: ${this.JSONCONFFile}`, error.message);
             return null;
         }
     }

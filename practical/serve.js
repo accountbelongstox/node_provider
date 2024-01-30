@@ -13,7 +13,7 @@ const indexDir = "." + path.dirname(mainServer.indexPath)
 const distDir = path.join(appRoot, indexDir)
 const http = require('http');
 
-const { strtool, urltool, file,plattool, setenv } = require('../util');
+const { strtool, urltool, file,plattool, setenv } = require('../utils');
 
 class Serve {
     httpPort = 18000
@@ -33,7 +33,7 @@ class Serve {
         });
     }
 
-    startFrontend(frontend, frontend_command, callback) {
+    startFrontend(frontend, frontend_command="dev", callback) {
         const yarn = setenv.where(`yarn`)
         console.log(`yarn`,yarn)
         const currentDir = process.cwd();

@@ -1,5 +1,5 @@
 const { Tray, Menu } = require('electron')
-const { src } = require('../practical');
+const { src } = require('../practicals');
 
 
 class ElectronTray {

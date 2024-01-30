@@ -4,7 +4,7 @@ const os = require('os')
 const path = require('path');
 const { app, protocol } = require('electron');
 const { execSync, exec } = require('child_process');
-const { file, } = require('../util');
+const { file, } = require('../utils');
 const log = require('../util/log');
 
 class ElectronInstance {
