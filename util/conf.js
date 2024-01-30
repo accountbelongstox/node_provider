@@ -7,7 +7,7 @@ class Conf {
     constructor(config_name="mainconf",config_sapce="dd_electron_userdata") {
         const localAppDataPath = path.join(os.homedir(), 'AppData', 'Local');
         this.userDataDir = path.join(localAppDataPath, config_sapce);
-        # 不存在则创建 this.userDataDir
+        //# 不存在则创建 this.userDataDir
         this.prefix = 'temp_conf_';
         this.JSONCONFFile = path.join(this.userDataDir, `${config_name}.json`);
         this.config = this.load()
