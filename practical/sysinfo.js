@@ -7,7 +7,7 @@ const path = require('path');
 const regedit = require('regedit').promisified;
 const { execSync, exec } = require('child_process');
 let config = {};
-const { file, tool, str } = require('../util');
+const { file, tool, str } = require('../utils');
 
 class Win {
     pathKey = 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment'
