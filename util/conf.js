@@ -7,21 +7,40 @@ class Conf {
     constructor(config_name="mainconf",config_sapce="dd_electron_userdata") {
         const localAppDataPath = path.join(os.homedir(), 'AppData', 'Local');
         this.userDataDir = path.join(localAppDataPath, config_sapce);
-        //# 不存在则创建 this.userDataDir
+        if (!fs.existsSync(this.userDataDir)) {
+            try {
+                fs.mkdirSync(this.userDataDir, { recursive: true });
+            } catch (err) {
+                console.error(err);
+            }
+        }
         this.prefix = 'temp_conf_';
         this.JSONCONFFile = path.join(this.userDataDir, `${config_name}.json`);
         this.config = this.load()
     }
 
-    //#完成该方法
-    getValue(name,default_configname){
-
+    getValue(name, defaultConfigFile = null) {
+        if (this.config.hasOwnProperty(name)) {
+            return this.config[name];
+        } else if (defaultConfigFile) {
+            const defaultConfig = this.load(defaultConfigFile);
+            return defaultConfig[name] || null;
+        } else {
+            return null;
+        }
     }
-    //#完成该方法
-    setValue(name,key,default_configname){
-
+    
+    setValue(name, value, defaultConfigFile = null) {
+        if (defaultConfigFile) {
+            const config = this.load(defaultConfigFile);
+            config[name] = value;
+            this.save(defaultConfigFile);
+        } else {
+            this.config[name] = value;
+            this.save();
+        }
     }
-
+    
     load(file) {
         if (!file) file = this.JSONCONFFile;
         if (!fs.existsSync(file)) {
@@ -49,7 +68,7 @@ class Conf {
         }
     }
 
-    setInitConfig(defaultConfig,file){
+    setInitConfig(file){
         if (!file) file = this.JSONCONFFile;
         const defaultConfigFile = this.load(file)
         return defaultConfigFile

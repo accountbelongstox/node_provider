@@ -147,6 +147,8 @@ class Plattools extends Base {
         }
         if (info) {
             this.info(command);
+            this.info(`cwd`);
+            this.info(cwd);
         }
         const options = { stdio: 'pipe' };
         let is_changed_dir = false

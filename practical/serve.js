@@ -13,7 +13,7 @@ const net = require('net');
 // const distDir = path.join(appRoot, indexDir)
 const http = require('http');
 
-const { strtool, urltool, file,plattool, setenv } = require('../utils');
+const { strtool, urltool, file, plattool, setenv } = require('../utils');
 
 class Serve {
     httpPort = 18000
@@ -33,30 +33,19 @@ class Serve {
         });
     }
 
-    startFrontend(frontend, frontend_command="dev", callback) {
+    async startFrontend(localFrontendDir, frontend_command = "dev", frontend_type = "vue", callback) {
         const yarn = setenv.where(`yarn`)
-        console.log(`yarn`,yarn)
-        const currentDir = process.cwd();
-        const frontendDir = file.resolvePath(frontend);
-        if (urltool.isHttpUrl(frontendDir)) {
-            callback(frontend);
-        } else if (file.isDir(file.resolvePath(frontendDir))) {
-            const start_command = `"${yarn}" ${frontend_command}`
-            // process.chdir(frontendDir);
-            if (!this.isNodeModulesNotEmpty(frontendDir) && this.isPackageJson(frontendDir)) {
-                plattool.spawnAsync(`yarn install`, true,frontendDir);
-            }
-            let debugUrl = ``
-            const result = plattool.spawnAsync(start_command,true,frontendDir)
-            // const result = execSync(start_command, { stdio: 'inherit' });
-            const output = strtool.toString(result);
-            debugUrl = urltool.extractHttpUrl(output)
-            // process.chdir(currentDir);
-            callback(debugUrl);
-        } else {
-            console.error(`Invalid frontend directory: ${frontendDir}`);
-            callback();
+        const frontendDir = file.resolvePath(localFrontendDir);
+        if (!this.isNodeModulesNotEmpty(frontendDir) && this.isPackageJson(frontendDir)) {
+            await plattool.spawnAsync(`yarn install`, true, frontendDir);
         }
+        const start_command = `${yarn} ${frontend_command}`
+        console.log(`start_command`,start_command,frontendDir)
+        let debugUrl = ``
+        const result =  plattool.execCmdSync(start_command, true, frontendDir)
+        const output = strtool.toString(result);
+        debugUrl = urltool.extractHttpUrl(output)
+        callback(debugUrl);
     }
 
     startHTTP(port) {

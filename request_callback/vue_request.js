@@ -21,6 +21,13 @@ class Socket {
         const ip = params.get('ip');
         return ip || '127.0.0.1';
     }
+    
+    get_remote_url() {
+        const params = new URLSearchParams(window.location.search);
+        const remoteUrl = params.get('remote_url');
+        return remoteUrl || '127.0.0.1';
+    }
+    
 
     async connect() {
         if (this.socket) {
