@@ -1,15 +1,16 @@
 const { Tray, Menu } = require('electron')
 const { src } = require('../practical');
 
+let tray = null
 
 class ElectronTray {
-    tray = null
 
-    createTray(trayMenuItems,icon) {
+    createTray(trayMenuItems,icon,title) {
         if(!icon)icon = src.getDefaultImageFile()
-        this.tray = new Tray(icon);
+        tray = new Tray(icon);
         const contextMenu = Menu.buildFromTemplate(trayMenuItems);
-        this.tray.setContextMenu(contextMenu);
+        tray.setContextMenu(contextMenu);
+        tray.setToolTip(title);
     }
 }
 

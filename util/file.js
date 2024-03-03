@@ -19,6 +19,228 @@ class File extends Base {
     execCountTasks = 0
     copyDirectoryCallbak = {}
 
+    getEncode(file_name, encoding = null, info = false) {
+        const codings = [
+            "utf-8",
+            "utf-16",
+            "utf-16le",
+            "utf-16BE",
+            "gbk",
+            "gb2312",
+            "us-ascii",
+            "ascii",
+            "IBM037",
+            "IBM437",
+            "IBM500",
+            "ASMO-708",
+            "DOS-720",
+            "ibm737",
+            "ibm775",
+            "ibm850",
+            "ibm852",
+            "IBM855",
+            "ibm857",
+            "IBM00858",
+            "IBM860",
+            "ibm861",
+            "DOS-862",
+            "IBM863",
+            "IBM864",
+            "IBM865",
+            "cp866",
+            "ibm869",
+            "IBM870",
+            "windows-874",
+            "cp875",
+            "shift_jis",
+            "ks_c_5601-1987",
+            "big5",
+            "IBM1026",
+            "IBM01047",
+            "IBM01140",
+            "IBM01141",
+            "IBM01142",
+            "IBM01143",
+            "IBM01144",
+            "IBM01145",
+            "IBM01146",
+            "IBM01147",
+            "IBM01148",
+            "IBM01149",
+            "windows-1250",
+            "windows-1251",
+            "Windows-1252",
+            "windows-1253",
+            "windows-1254",
+            "windows-1255",
+            "windows-1256",
+            "windows-1257",
+            "windows-1258",
+            "Johab",
+            "macintosh",
+            "x-mac-japanese",
+            "x-mac-chinesetrad",
+            "x-mac-korean",
+            "x-mac-arabic",
+            "x-mac-hebrew",
+            "x-mac-greek",
+            "x-mac-cyrillic",
+            "x-mac-chinesesimp",
+            "x-mac-romanian",
+            "x-mac-ukrainian",
+            "x-mac-thai",
+            "x-mac-ce",
+            "x-mac-icelandic",
+            "x-mac-turkish",
+            "x-mac-croatian",
+            "utf-32",
+            "utf-32BE",
+            "x-Chinese-CNS",
+            "x-cp20001",
+            "x-Chinese-Eten",
+            "x-cp20003",
+            "x-cp20004",
+            "x-cp20005",
+            "x-IA5",
+            "x-IA5-German",
+            "x-IA5-Swedish",
+            "x-IA5-Norwegian",
+            "x-cp20261",
+            "x-cp20269",
+            "IBM273",
+            "IBM277",
+            "IBM278",
+            "IBM280",
+            "IBM284",
+            "IBM285",
+            "IBM290",
+            "IBM297",
+            "IBM420",
+            "IBM423",
+            "IBM424",
+            "x-EBCDIC-KoreanExtended",
+            "IBM-Thai",
+            "koi8-r",
+            "IBM871",
+            "IBM880",
+            "IBM905",
+            "IBM00924",
+            "EUC-JP",
+            "x-cp20936",
+            "x-cp20949",
+            "cp1025",
+            "koi8-u",
+            "iso-8859-1",
+            "iso-8859-2",
+            "iso-8859-3",
+            "iso-8859-4",
+            "iso-8859-5",
+            "iso-8859-6",
+            "iso-8859-7",
+            "iso-8859-8",
+            "iso-8859-9",
+            "iso-8859-13",
+            "iso-8859-15",
+            "x-Europa",
+            "iso-8859-8-i",
+            "iso-2022-jp",
+            "csISO2022JP",
+            "iso-2022-jp",
+            "iso-2022-kr",
+            "x-cp50227",
+            "euc-jp",
+            "EUC-CN",
+            "euc-kr",
+            "hz-gb-2312",
+            "GB18030",
+            "x-iscii-de",
+            "x-iscii-be",
+            "x-iscii-ta",
+            "x-iscii-te",
+            "x-iscii-as",
+            "x-iscii-or",
+            "x-iscii-ka",
+            "x-iscii-ma",
+            "x-iscii-gu",
+            "x-iscii-pa",
+            "utf-7",
+        ];
+        if (encoding !== null) {
+            codings.unshift(encoding);
+        }
+        let index = 0;
+        while (index < codings.length) {
+            encoding = codings[index];
+            try {
+                const content = fs.readFileSync(file_name, { encoding });
+                if (info) {
+                    console.log(`Successfully mode ${encoding} to ${file_name}`);
+                }
+                return { encoding, content };
+            } catch (error) {
+                console.warn(`File open error: ${file_name}`);
+                console.warn(error);
+                index++;
+            }
+        }
+        return null;
+    }
+    getPath(fpath) {
+        if (fs.existsSync(fpath) && fs.statSync(fpath).isFile()) {
+            return fpath;
+        }
+        const public_dir = this.com_config.getPublic(fpath);
+        if (fs.existsSync(public_dir) && fs.statSync(public_dir).isFile()) {
+            return public_dir;
+        }
+
+        fpath = path.join(this.getCwd(), fpath);
+        if (fs.existsSync(fpath) && fs.statSync(fpath).isFile()) {
+            return fpath;
+        }
+
+        return fpath;
+    }
+
+    getPublic(fpath) {
+        const cwd = process.cwd();
+        const publicPath = path.join(cwd, 'public');
+        if (!fs.existsSync(publicPath)) {
+            fs.mkdirSync(publicPath, { recursive: true });
+        }
+        if(!fpath)return publicPath
+        if (!path.isAbsolute(fpath)) {
+            return path.join(publicPath, fpath);
+        }
+        return fpath;
+    }
+
+    getResource(filename) {
+        const resourcePath = path.join(cwd, 'resource');
+        if (!fs.existsSync(resource)) {
+            fs.mkdirSync(resourcePath, { recursive: true });
+        }
+        
+        if(!filename)return resourcePath
+        if (!path.isAbsolute(filename)) {
+            return path.join(resourcePath, filename);
+        }
+        return filename;
+    }
+
+    loadFile(file_name, encoding = "utf-8", info = false) {
+        file_name = this.getPath(file_name);
+        if (!this.isFile(file_name)) {
+            console.error('File does not exist.');
+            return "";
+        }
+        const fileObject = this.getEncode(file_name, encoding, info);
+        if (fileObject !== null) {
+            return fileObject.content;
+        }
+        return null;
+    }
+
     getElectronRootByBuild() {
         return this.findRootDirectory(path.resolve(__dirname))
     }
@@ -358,10 +580,42 @@ class File extends Base {
 
     readFile(filePath) {
         try {
-            const rawData = fs.readFileSync(filePath, 'utf-8');
+            const rawData = this.loadFile(filePath, 'utf-8');
             return rawData;
         } catch (err) {
             console.error(`Failed to read JSON file: ${err}`);
+            return null;
+        }
+    }
+
+    readLines(filePath) {
+        try {
+            const rawData = this.loadFile(filePath, 'utf-8');
+            const lines = rawData.split('\n');
+            return lines;
+        } catch (err) {
+            console.error(`Failed to read file: ${err}`);
+            return [];
+        }
+    }
+
+    readFirstLine(filePath) {
+        try {
+            const rawData = this.loadFile(filePath, 'utf-8');
+            const lines = rawData.split('\n');
+            return lines[0];
+        } catch (err) {
+            console.error(`Failed to read file: ${err}`);
+            return ``;
+        }
+    }
+
+    readBinary(filePath) {
+        try {
+            const rawData = this.loadFile(filePath, 'utf-8');
+            return rawData;
+        } catch (err) {
+            console.error(`Failed to read file: ${err}`);
             return null;
         }
     }

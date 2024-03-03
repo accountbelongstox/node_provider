@@ -13,7 +13,7 @@ const indexDir = "." + path.dirname(mainServer.indexPath)
 const distDir = path.join(appRoot, indexDir)
 const http = require('http');
 
-const { strtool, urltool, file,plattool, setenv } = require('../util');
+const { strtool, urltool, file,plattool, setenv,env } = require('../util');
 
 class Serve {
     httpPort = 18000
@@ -33,25 +33,36 @@ class Serve {
         });
     }
 
-    startFrontend(frontend, frontend_command, callback) {
-        const yarn = setenv.where(`yarn`)
-        console.log(`yarn`,yarn)
+    startFrontend(frontend, frontend_command, yarn,callback) {
+        const env_FRONTEND_COMMAND = env.getEnv(`FRONTEND_COMMAND`)
+        const env_FRONTEND_PORT = env.getEnv(`FRONTEND_PORT`)
+        const env_FRONTEND = env.getEnv(`FRONTEND`)
+        if(!yarn)yarn = setenv.where(`yarn`)
         const currentDir = process.cwd();
         const frontendDir = file.resolvePath(frontend);
+        console.log(`env_FRONTEND_COMMAND`,env_FRONTEND_COMMAND)
+        console.log(`env_FRONTEND_PORT`,env_FRONTEND_PORT)
+        console.log(`env_FRONTEND`,env_FRONTEND)
+        console.log(`env_FRONTEND_COMMAND`,env_FRONTEND_COMMAND)
+        console.log(`yarn`,yarn)
+        console.log(`currentDir`,currentDir)
+        console.log(`frontendDir`,frontendDir)
+        console.log(`isHttpUrl`,urltool.isHttpUrl(frontendDir))
+        console.log(`resolvePath`,file.resolvePath(frontendDir))
         if (urltool.isHttpUrl(frontendDir)) {
             callback(frontend);
         } else if (file.isDir(file.resolvePath(frontendDir))) {
-            const start_command = `"${yarn}" ${frontend_command}`
-            // process.chdir(frontendDir);
+            const start_command = `${yarn} ${frontend_command}`
+            process.chdir(frontendDir);
             if (!this.isNodeModulesNotEmpty(frontendDir) && this.isPackageJson(frontendDir)) {
                 plattool.spawnAsync(`yarn install`, true,frontendDir);
             }
+            console.log(`start_command`,start_command)
             let debugUrl = ``
             const result = plattool.spawnAsync(start_command,true,frontendDir)
-            // const result = execSync(start_command, { stdio: 'inherit' });
             const output = strtool.toString(result);
             debugUrl = urltool.extractHttpUrl(output)
-            // process.chdir(currentDir);
+            process.chdir(currentDir);
             callback(debugUrl);
         } else {
             console.error(`Invalid frontend directory: ${frontendDir}`);

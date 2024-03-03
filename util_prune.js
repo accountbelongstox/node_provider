@@ -14,6 +14,7 @@ const log = require('./util/log.js');
 const winston = require('winston');
 const plattool = require('./util/plattool');
 const sysarg = require('./util/sysarg');
+const env = require('./util/env.js');
 
 module.exports = {
     toString: () => '[class UtilPrune]',
@@ -31,5 +32,6 @@ module.exports = {
     conf:conf,
     plattool,
     log,
-    sysarg
+    sysarg,
+    env
 };

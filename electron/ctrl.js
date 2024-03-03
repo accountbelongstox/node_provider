@@ -21,11 +21,11 @@ class ElectronCtrl {
         let restartTime = layout > 0 ? layout / 1000 : 0;
         if (restartTime > 0) {
             console.log(`The application will restart in ${restartTime} seconds...`);
-            const timer = setInterval(() => {
+            const atimer = setInterval(() => {
                 restartTime = restartTime - 1;
                 console.log(`Restart countdown: ${restartTime} seconds`);
                 if (restartTime <= 0) {
-                    clearInterval(timer);
+                    clearInterval(atimer);
                     console.log('Restarting...');
                     app.relaunch();
                     app.exit();

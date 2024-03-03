@@ -14,6 +14,7 @@ const log = require('./util/log.js');
 const plattool = require('./util/plattool');
 const sysarg = require('./util/sysarg');
 const setenv = require('./util/setenv.js');
+const env = require('./util/env.js');
 
 
 module.exports = {
@@ -34,4 +35,5 @@ module.exports = {
     log,
     sysarg,
     setenv,
+    env,
 };

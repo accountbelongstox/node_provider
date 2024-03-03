@@ -169,6 +169,7 @@ class Plattools extends Base {
 
 
     async spawnAsync(command, info = false, cwd = null) {
+        console.log(`command`,command)
         return new Promise((resolve, reject) => {
             const childProcess = spawn(command, [], {
                 shell: true,
