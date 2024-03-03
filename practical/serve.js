@@ -13,11 +13,7 @@ const net = require('net');
 // const distDir = path.join(appRoot, indexDir)
 const http = require('http');
 
-<<<<<<< HEAD
 const { strtool, urltool, file,plattool, setenv,env } = require('../util');
-=======
-const { strtool, urltool, file, plattool, setenv } = require('../utils');
->>>>>>> 132bf70f1c27eab38d227b01dcb1d2a482bfbe87
 
 class Serve {
     httpPort = 18000
@@ -37,7 +33,6 @@ class Serve {
         });
     }
 
-<<<<<<< HEAD
     startFrontend(frontend, frontend_command, yarn,callback) {
         const env_FRONTEND_COMMAND = env.getEnv(`FRONTEND_COMMAND`)
         const env_FRONTEND_PORT = env.getEnv(`FRONTEND_PORT`)
@@ -72,13 +67,6 @@ class Serve {
         } else {
             console.error(`Invalid frontend directory: ${frontendDir}`);
             callback();
-=======
-    async startFrontend(localFrontendDir, frontend_command = "dev", frontend_type = "vue", callback) {
-        const yarn = setenv.where(`yarn`)
-        const frontendDir = file.resolvePath(localFrontendDir);
-        if (!this.isNodeModulesNotEmpty(frontendDir) && this.isPackageJson(frontendDir)) {
-            await plattool.spawnAsync(`yarn install`, true, frontendDir);
->>>>>>> 132bf70f1c27eab38d227b01dcb1d2a482bfbe87
         }
         const start_command = `${yarn} ${frontend_command}`
         console.log(`start_command`,start_command,frontendDir)
