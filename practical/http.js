@@ -13,7 +13,7 @@ const {
     strtool,
     tool,
     urltool
-} = require('../util.js');
+} = require('../utils.js');
 const encyclopedia = require('../model/encyclopedia.js').getEncyclopedia();
 
 let debug_send_event = false
@@ -169,9 +169,9 @@ class httpWidget {
                     return resolve(result)
                 }
             }
-            file.mkbasedir(dest)
+            file.mkbasedir(dest) // 此处可能需要更改，避免变量名冲突
             const protocol = url.startsWith('https') ? https : http;
-            const file = fs.createWriteStream(dest);
+            const fileStream = fs.createWriteStream(dest); // 更改变量名
             const req = protocol.get(url, res => {
                 if (res.statusCode !== 200) {
                     result.dest = false
@@ -180,9 +180,9 @@ class httpWidget {
                     resolve(result);
                     return;
                 }
-                res.pipe(file);
-                file.on('finish', () => {
-                    file.close();
+                res.pipe(fileStream); // 更改变量名
+                fileStream.on('finish', () => { // 更改变量名
+                    fileStream.close(); // 更改变量名
                     result.success = true
                     result.usetime = Date.now() - startTime
                     resolve(result)
@@ -195,7 +195,7 @@ class httpWidget {
                 result.usetime = Date.now() - startTime
                 resolve(result);
             });
-            file.on('error', error => {
+            fileStream.on('error', error => { // 更改变量名
                 console.log(`error`)
                 console.log(error)
                 fs.unlink(dest);
@@ -207,6 +207,7 @@ class httpWidget {
             req.end();
         }).catch((err) => { console.log(err) })
     }
+    
 
     async download(url, downloadDir) {
         if (!downloadDir) downloadDir = winapiWidget.getDocumentsDir()

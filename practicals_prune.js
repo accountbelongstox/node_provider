@@ -5,7 +5,7 @@ const http = require('./practical/http.js');
 const env = require('./practical/env.js');
 
 module.exports = {
-    toString: () => '[class PracticalPrune]',
+    toString: () => '[class PracticalsPrune]',
     zip,
     src,
     opt,

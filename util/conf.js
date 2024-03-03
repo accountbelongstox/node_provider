@@ -4,14 +4,43 @@ const path = require('path');
 const crypto = require('crypto');
 
 class Conf {
-    constructor(config_name="default",config_sapce="configuration") {
-        this.userDataDir = path.join(os.homedir(), 'userData');
-        this.confDir = path.join(config_sapce, 'userData');
+    constructor(config_name="mainconf",config_sapce="dd_electron_userdata") {
+        const localAppDataPath = path.join(os.homedir(), 'AppData', 'Local');
+        this.userDataDir = path.join(localAppDataPath, config_sapce);
+        if (!fs.existsSync(this.userDataDir)) {
+            try {
+                fs.mkdirSync(this.userDataDir, { recursive: true });
+            } catch (err) {
+                console.error(err);
+            }
+        }
         this.prefix = 'temp_conf_';
-        this.JSONCONFFile = path.join(this.confDir, `${config_name}.json`);
+        this.JSONCONFFile = path.join(this.userDataDir, `${config_name}.json`);
         this.config = this.load()
     }
 
+    getValue(name, defaultConfigFile = null) {
+        if (this.config.hasOwnProperty(name)) {
+            return this.config[name];
+        } else if (defaultConfigFile) {
+            const defaultConfig = this.load(defaultConfigFile);
+            return defaultConfig[name] || null;
+        } else {
+            return null;
+        }
+    }
+    
+    setValue(name, value, defaultConfigFile = null) {
+        if (defaultConfigFile) {
+            const config = this.load(defaultConfigFile);
+            config[name] = value;
+            this.save(defaultConfigFile);
+        } else {
+            this.config[name] = value;
+            this.save();
+        }
+    }
+    
     load(file) {
         if (!file) file = this.JSONCONFFile;
         if (!fs.existsSync(file)) {
@@ -39,7 +68,7 @@ class Conf {
         }
     }
 
-    setInitConfig(defaultConfig,file){
+    setInitConfig(file){
         if (!file) file = this.JSONCONFFile;
         const defaultConfigFile = this.load(file)
         return defaultConfigFile
@@ -101,7 +130,7 @@ class Conf {
             console.log('Config file created:', this.JSONCONFFile);
             return this.JSONCONFFile;
         } catch (error) {
-            console.error('Unable to create config file:', error.message);
+            console.error(`Unable to create config file: ${this.JSONCONFFile}`, error.message);
             return null;
         }
     }
@@ -125,17 +154,23 @@ class Conf {
         }
     }
 
-    getValueByHierarchy(keys) {
+    getValueByHierarchy(keys, defaultValue = null) {
         let current = this.config;
-        for (const key of keys) {
-            if (current.hasOwnProperty(key)) {
-                current = current[key];
-            } else {
-                return null;
+        try {
+            for (const key of keys) {
+                if (current.hasOwnProperty(key)) {
+                    current = current[key];
+                } else {
+                    throw new Error(`Key ${key} not found in hierarchy`);
+                }
             }
+            return current;
+        } catch (error) {
+            console.error(`Error while getting value by hierarchy: ${error.message}`);
+            return defaultValue;
         }
-        return current;
     }
+    
 
     getConfigObject() {
         return { config: this.config };

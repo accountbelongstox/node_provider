@@ -11,8 +11,8 @@ const htmlparse = require('./util/htmlparse.js');
 const math_ = require('./util/math.js');
 const conf = require('./util/conf.js');
 const log = require('./util/log.js');
-const plattool = require('./util/plattool');
-const sysarg = require('./util/sysarg');
+const plattool = require('./util/plattool.js');
+const sysarg = require('./util/sysarg.js');
 const setenv = require('./util/setenv.js');
 const env = require('./util/env.js');
 

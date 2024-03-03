@@ -133,6 +133,10 @@ class Plattools extends Base {
         }
     }
 
+    async cmdAsync(command, info = true, cwd = null, logname = null) {
+        return await this.execCmd(command, info, cwd, logname)
+    }
+
     cmdSync(command, info = true, cwd = null, logname = null) {
         return this.execCmdSync(command, info, cwd, logname)
     }
@@ -143,6 +147,8 @@ class Plattools extends Base {
         }
         if (info) {
             this.info(command);
+            this.info(`cwd`);
+            this.info(cwd);
         }
         const options = { stdio: 'pipe' };
         let is_changed_dir = false

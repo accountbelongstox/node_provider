@@ -1,6 +1,6 @@
 'use strict';
 const path = require('path');
-const Util = require('../util');
+const Util = require('../utils');
 const UserAgent = require('user-agents');
 
 class Options {

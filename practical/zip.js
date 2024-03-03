@@ -2,7 +2,7 @@
 const { exec, execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
-const { file, str, platform } = require('../util');
+const { file, str, platform } = require('../utils');
 
 class Zip {
     callbacks = {}
