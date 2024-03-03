@@ -13,7 +13,7 @@ const net = require('net');
 // const distDir = path.join(appRoot, indexDir)
 const http = require('http');
 
-const { strtool, urltool, file,plattool, setenv,env } = require('../util');
+const { strtool, urltool, file,plattool, setenv,env } = require('../utils.js');
 
 class Serve {
     httpPort = 18000
