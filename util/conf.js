@@ -7,12 +7,23 @@ class Conf {
     constructor(config_name="mainconf",config_sapce="dd_electron_userdata") {
         const localAppDataPath = path.join(os.homedir(), 'AppData', 'Local');
         this.userDataDir = path.join(localAppDataPath, config_sapce);
+<<<<<<< HEAD
         //# 不存在则创建 this.userDataDir
+=======
+        if (!fs.existsSync(this.userDataDir)) {
+            try {
+                fs.mkdirSync(this.userDataDir, { recursive: true });
+            } catch (err) {
+                console.error(err);
+            }
+        }
+>>>>>>> 7277f84d66832d12cb6601508e31e28ae87fed3f
         this.prefix = 'temp_conf_';
         this.JSONCONFFile = path.join(this.userDataDir, `${config_name}.json`);
         this.config = this.load()
     }
 
+<<<<<<< HEAD
     //#完成该方法
     getValue(name,default_configname){
 
@@ -22,6 +33,30 @@ class Conf {
 
     }
 
+=======
+    getValue(name, defaultConfigFile = null) {
+        if (this.config.hasOwnProperty(name)) {
+            return this.config[name];
+        } else if (defaultConfigFile) {
+            const defaultConfig = this.load(defaultConfigFile);
+            return defaultConfig[name] || null;
+        } else {
+            return null;
+        }
+    }
+    
+    setValue(name, value, defaultConfigFile = null) {
+        if (defaultConfigFile) {
+            const config = this.load(defaultConfigFile);
+            config[name] = value;
+            this.save(defaultConfigFile);
+        } else {
+            this.config[name] = value;
+            this.save();
+        }
+    }
+    
+>>>>>>> 7277f84d66832d12cb6601508e31e28ae87fed3f
     load(file) {
         if (!file) file = this.JSONCONFFile;
         if (!fs.existsSync(file)) {
@@ -49,7 +84,11 @@ class Conf {
         }
     }
 
+<<<<<<< HEAD
     setInitConfig(defaultConfig,file){
+=======
+    setInitConfig(file){
+>>>>>>> 7277f84d66832d12cb6601508e31e28ae87fed3f
         if (!file) file = this.JSONCONFFile;
         const defaultConfigFile = this.load(file)
         return defaultConfigFile

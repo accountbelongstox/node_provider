@@ -130,8 +130,11 @@ class Source  {
         return os.platform() === 'win32';
     }
 
+<<<<<<< HEAD
 
     
+=======
+>>>>>>> 7277f84d66832d12cb6601508e31e28ae87fed3f
     async downloadChromeBinary() {
         if (this.isWindows()) {
             const remoteUrl = this.comConfig.getGlobal('remote_url');

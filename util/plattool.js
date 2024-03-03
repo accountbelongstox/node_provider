@@ -147,6 +147,11 @@ class Plattools extends Base {
         }
         if (info) {
             this.info(command);
+<<<<<<< HEAD
+=======
+            this.info(`cwd`);
+            this.info(cwd);
+>>>>>>> 7277f84d66832d12cb6601508e31e28ae87fed3f
         }
         const options = { stdio: 'pipe' };
         let is_changed_dir = false
@@ -173,6 +178,10 @@ class Plattools extends Base {
 
 
     async spawnAsync(command, info = false, cwd = null) {
+<<<<<<< HEAD
+=======
+        console.log(`command`,command)
+>>>>>>> 7277f84d66832d12cb6601508e31e28ae87fed3f
         return new Promise((resolve, reject) => {
             const childProcess = spawn(command, [], {
                 shell: true,
