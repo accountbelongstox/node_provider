@@ -181,7 +181,6 @@ class Win {
             return [];
         }
     }
-
     exec_explorer(file_path, group, default_config, callback) {
         file_path = path.normalize(file_path)
         if (!fs.existsSync(file_path)) {
@@ -193,7 +192,6 @@ class Win {
             if (callback) callback(err, std)
         });
     }
-
     exec_asadmin(file_path, group, default_config, pare = '', callback) {
         file_path = path.normalize(file_path)
         let cmd
@@ -336,6 +334,38 @@ class Win {
         if (callback) callback(vs)
     }
 
+    async  killProcessByPort(port) {
+        return new Promise((resolve, reject) => {
+            const netstatCommand = `netstat -ano | findstr :${port}`;
+            exec(netstatCommand, (error, stdout, stderr) => {
+                if (error) {
+                    reject(error);
+                    return;
+                }
+                const lines = stdout.trim().split('\n');
+                const pidRegex = /(\d+)$/; // Regular expression to match PID at the end of each line
+                const pids = lines.map(line => {
+                    const match = line.match(pidRegex);
+                    return match ? match[1] : null;
+                }).filter(pid => pid); // Filter out null values
+    
+                if (pids.length === 0) {
+                    resolve(`No processes found using port ${port}`);
+                    return;
+                }
+    
+                const forceOption = pids.length > 1 ? '/F' : '';
+                const taskkillCommand = `taskkill ${forceOption} /PID ${pids.join(' /PID ')}`;
+                exec(taskkillCommand, (error, stdout, stderr) => {
+                    if (error) {
+                        reject(error);
+                        return;
+                    }
+                    resolve(stdout.trim());
+                });
+            });
+        });
+    }
 }
 
 Win.toString = () => '[class Win Api]';

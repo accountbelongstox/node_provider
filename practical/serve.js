@@ -1,30 +1,22 @@
 const path = require('path');
+const { exec } = require('child_process');
 const fs = require('fs');
-const conf = require('../util/conf');
-const { app } = require('../electron');
-const { execSync } = require('child_process');
-// const remoteUrl = conf.getValue('remoteUrl')
-// const expressPort = remoteUrl.url.match(/:(\d+)/);
-// const port = parseInt(expressPort[1], 10);
-const net = require('net');
+const Base = require('../base/base');
+const { getnode,porttool } = require('../../node_provider/utils.js');
 // const appRoot = path.resolve(app.getAppPath());
 // const mainServer = conf.getValue('mainServer')
 // const indexDir = "." + path.dirname(mainServer.indexPath)
 // const distDir = path.join(appRoot, indexDir)
 const http = require('http');
+const { strtool, urltool, file, plattool, setenv, env } = require('../utils.js');
+let electronShell = null
 
-<<<<<<< HEAD
-const { strtool, urltool, file,plattool, setenv } = require('../utils');
-=======
-const { strtool, urltool, file,plattool, setenv,env } = require('../utils.js');
->>>>>>> 7277f84d66832d12cb6601508e31e28ae87fed3f
-
-class Serve {
+class Serve extends Base {
     httpPort = 18000
-
+    currentDir = process.cwd();
     constructor() {
+        super()
     }
-
     startVue(port = 23350, distDir = "dist") {
         const handler = require('serve-handler');
         const server = http.createServer((request, response) => {
@@ -36,110 +28,69 @@ class Serve {
             console.log(`Running at http://localhost:${port}`);
         });
     }
-
-<<<<<<< HEAD
-    startFrontend(frontend, frontend_command="dev", callback) {
-        const yarn = setenv.where(`yarn`)
-        console.log(`yarn`,yarn)
-        const currentDir = process.cwd();
+    async startFrontend(frontend, frontend_command, node_version = `18`, callback) {
+        const frontend_port = env.getEnv(`FRONTEND_PORT`)
         const frontendDir = file.resolvePath(frontend);
         if (urltool.isHttpUrl(frontendDir)) {
             callback(frontend);
         } else if (file.isDir(file.resolvePath(frontendDir))) {
-            const start_command = `"${yarn}" ${frontend_command}`
-            // process.chdir(frontendDir);
-            if (!this.isNodeModulesNotEmpty(frontendDir) && this.isPackageJson(frontendDir)) {
-                plattool.spawnAsync(`yarn install`, true,frontendDir);
-            }
-            let debugUrl = ``
-            const result = plattool.spawnAsync(start_command,true,frontendDir)
-            // const result = execSync(start_command, { stdio: 'inherit' });
-            const output = strtool.toString(result);
-            debugUrl = urltool.extractHttpUrl(output)
-            // process.chdir(currentDir);
-=======
-    startFrontend(frontend, frontend_command, yarn,callback) {
-        const env_FRONTEND_COMMAND = env.getEnv(`FRONTEND_COMMAND`)
-        const env_FRONTEND_PORT = env.getEnv(`FRONTEND_PORT`)
-        const env_FRONTEND = env.getEnv(`FRONTEND`)
-        if(!yarn)yarn = setenv.where(`yarn`)
-        const currentDir = process.cwd();
-        const frontendDir = file.resolvePath(frontend);
-        console.log(`env_FRONTEND_COMMAND`,env_FRONTEND_COMMAND)
-        console.log(`env_FRONTEND_PORT`,env_FRONTEND_PORT)
-        console.log(`env_FRONTEND`,env_FRONTEND)
-        console.log(`env_FRONTEND_COMMAND`,env_FRONTEND_COMMAND)
-        console.log(`yarn`,yarn)
-        console.log(`currentDir`,currentDir)
-        console.log(`frontendDir`,frontendDir)
-        console.log(`isHttpUrl`,urltool.isHttpUrl(frontendDir))
-        console.log(`resolvePath`,file.resolvePath(frontendDir))
-        if (urltool.isHttpUrl(frontendDir)) {
-            callback(frontend);
-        } else if (file.isDir(file.resolvePath(frontendDir))) {
-            const start_command = `${yarn} ${frontend_command}`
-            process.chdir(frontendDir);
-            if (!this.isNodeModulesNotEmpty(frontendDir) && this.isPackageJson(frontendDir)) {
-                plattool.spawnAsync(`yarn install`, true,frontendDir);
-            }
-            console.log(`start_command`,start_command)
-            let debugUrl = ``
-            const result = plattool.spawnAsync(start_command,true,frontendDir)
-            const output = strtool.toString(result);
-            debugUrl = urltool.extractHttpUrl(output)
-            process.chdir(currentDir);
->>>>>>> 7277f84d66832d12cb6601508e31e28ae87fed3f
-            callback(debugUrl);
+            this.runByNpm(frontendDir, frontend_command, node_version, (result) => {
+                result = result && result.stdout ? result.stdout : ``
+                const resultString = strtool.toString(result);
+                let debugUrl = urltool.extractHttpUrl(resultString)
+                if (!debugUrl) debugUrl = `http://localhost:${frontend_port}`
+                callback(debugUrl);
+            })
         } else {
             console.error(`Invalid frontend directory: ${frontendDir}`);
-            callback();
+            callback(null);
         }
-<<<<<<< HEAD
-=======
-        const start_command = `${yarn} ${frontend_command}`
-        console.log(`start_command`,start_command,frontendDir)
-        let debugUrl = ``
-        const result =  plattool.execCmdSync(start_command, true, frontendDir)
-        const output = strtool.toString(result);
-        debugUrl = urltool.extractHttpUrl(output)
-        callback(debugUrl);
->>>>>>> 7277f84d66832d12cb6601508e31e28ae87fed3f
     }
-
+    async runCommand(frontendDir, frontend_command, node_version = '18', useYarn = false, callback) {
+        const frontend_port = env.getEnv(`FRONTEND_PORT`)
+        let is_port_use = await porttool.isPortInUse(frontend_port)
+        // if (is_port_use) {
+        //     await this.killProcessByPort(frontend_port)
+        // }
+        if (!is_port_use) {
+            let exe = await getnode.getNpmByNodeVersion(node_version);
+            if (useYarn) {
+                exe = await getnode.getYarnByNodeVersion(node_version);
+            }
+            let start_command = `${exe} run ${frontend_command}`;
+            if (useYarn) {
+                start_command = `${exe} ${frontend_command}`;
+            }
+            process.chdir(frontendDir);
+            if (!this.isNodeModulesNotEmpty(frontendDir) && this.isPackageJson(frontendDir)) {
+                await this.installNodeModules(frontendDir, node_version, useYarn);
+            }
+            plattool.spawnAsync(start_command, true, frontendDir, null, callback)
+        } else {
+            this.info(`The front-end server is started and the port ${frontend_port} is occupied.`)
+            if(callback)callback(null)
+        }
+    }
+    async runByNpm(frontendDir, frontend_command, node_version = '18', callback) {
+        const useYarn = false
+        const result = await this.runCommand(frontendDir, frontend_command, node_version, useYarn, callback);
+        return result
+    }
+    async runByYarn(frontendDir, frontend_command, node_version = '18', callback) {
+        const result = await this.runCommand(frontendDir, frontend_command, node_version, true, callback);
+        return result
+    }
     startHTTP(port) {
         port = port ? port : this.startPort
-        http.checkPort(port)
+        this.checkPort(port)
             .then((freePort) => {
                 console.log(`freePort ${freePort}`)
-                http.startHTTPServer(freePort)
+                this.startHTTPServer(freePort)
             })
             .catch((error) => {
                 console.error('Error while checking ports:', error);
             });
     }
-
-    checkPort(port) {
-        return new Promise((resolve, reject) => {
-            const tester = net.createServer();
-            tester.once('error', (err) => {
-                if (err.code === 'EADDRINUSE') {
-                    tester.close(() => () => {
-                        return this.checkPort(port + 1).then(resolve).catch(e => { })
-                    });
-                } else {
-                    reject(err);
-                    resolve(null);
-                }
-            });
-
-            tester.once('listening', () => {
-                tester.close(() => resolve(port));
-            });
-
-            tester.listen(port);
-        });
-    }
-
     isNodeModulesNotEmpty(directory) {
         const nodeModulesPath = path.join(directory, 'node_modules');
         if (!fs.existsSync(nodeModulesPath)) {
@@ -160,6 +111,43 @@ class Serve {
         }
         const contents = fs.readdirSync(directory);
         return contents.length == 0;
+    }
+
+    async installNodeModules(directory, node_version = '18', useYarn = false) {
+        let exe;
+        if (useYarn) {
+            exe = await getnode.getYarnByNodeVersion(node_version);
+        } else {
+            exe = await getnode.getNpmByNodeVersion(node_version);
+        }
+        let resultString = ``
+        if (!this.isNodeModulesNotEmpty(directory) && this.isPackageJson(directory)) {
+            process.chdir(directory);
+            const command = `${exe} install`
+            const result = await plattool.spawnSync(command, true, directory);
+            resultString = strtool.toString(result);
+        }
+        process.chdir(this.currentDir);
+        return resultString
+    }
+    
+    getFrontendServerUrl() {
+        const frontend_port = env.getEnv(`FRONTEND_PORT`)
+        return `http://localhost:${frontend_port}`
+    }
+
+    openFrontendServerUrl(openUrl) {
+        if (!openUrl) openUrl = this.getFrontendServerUrl()
+        openUrl = urltool.toOpenUrl(openUrl)
+        try{
+            if(!electronShell){
+                const { shell } = require('electron');
+                electronShell = shell
+            }
+            electronShell.openExternal(openUrl);
+        }catch(e){
+            console.log(e)
+        }
     }
 
 }

@@ -11,7 +11,7 @@ class Env {
         this.setRootDir(rootDir, envName, delimiter);
     }
     getCwd() {
-        return path.dirname(__filename);
+        return process.cwd();
     }
     setDelimiter(delimiter = "=") {
         this.delimiter = delimiter;

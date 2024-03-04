@@ -19,8 +19,6 @@ class File extends Base {
     execCountTasks = 0
     copyDirectoryCallbak = {}
 
-<<<<<<< HEAD
-=======
     getEncode(file_name, encoding = null, info = false) {
         const codings = [
             "utf-8",
@@ -187,6 +185,7 @@ class File extends Base {
         }
         return null;
     }
+
     getPath(fpath) {
         if (fs.existsSync(fpath) && fs.statSync(fpath).isFile()) {
             return fpath;
@@ -243,7 +242,6 @@ class File extends Base {
         return null;
     }
 
->>>>>>> 7277f84d66832d12cb6601508e31e28ae87fed3f
     getElectronRootByBuild() {
         return this.findRootDirectory(path.resolve(__dirname))
     }
@@ -583,11 +581,7 @@ class File extends Base {
 
     readFile(filePath) {
         try {
-<<<<<<< HEAD
-            const rawData = fs.readFileSync(filePath, 'utf-8');
-=======
             const rawData = this.loadFile(filePath, 'utf-8');
->>>>>>> 7277f84d66832d12cb6601508e31e28ae87fed3f
             return rawData;
         } catch (err) {
             console.error(`Failed to read JSON file: ${err}`);
@@ -595,8 +589,6 @@ class File extends Base {
         }
     }
 
-<<<<<<< HEAD
-=======
     readLines(filePath) {
         try {
             const rawData = this.loadFile(filePath, 'utf-8');
@@ -629,7 +621,6 @@ class File extends Base {
         }
     }
 
->>>>>>> 7277f84d66832d12cb6601508e31e28ae87fed3f
     getFileSize(filePath) {
         if (!this.existsSync(filePath)) {
             return -1

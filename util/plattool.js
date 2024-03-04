@@ -1,4 +1,4 @@
-const { execSync, spawn, exec } = require('child_process');
+const { execSync, spawn, exec, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const Base = require('../base/base');
@@ -7,6 +7,7 @@ class Plattools extends Base {
     constructor() {
         super();
         this.initialWorkingDirectory = process.cwd();
+        this.currentDir = process.cwd();
     }
 
     async cmd(command, info = false, cwd = null, logname = null) {
@@ -23,8 +24,8 @@ class Plattools extends Base {
                 process.chdir(cwd);
             }
             const childProcess = this.isLinux()
-                ? spawn('/bin/bash', ['-c', command], options)
-                : spawn(command, options);
+                ? spawnSync('/bin/bash', ['-c', command], options)
+                : spawnSync(command, options);
 
             let stdoutData = '';
             let stderrData = '';
@@ -59,27 +60,35 @@ class Plattools extends Base {
             });
         });
     }
-
-    async execCmd(command, info = true, cwd = null, logname = null) {
+    async execCmdSync(command, info = true, cwd = null, logname = null) {
+        let cmd = '';
+        let args = [];
+        command = command.split(/\s+/)
         if (Array.isArray(command)) {
-            command = command.join(" ");
+            cmd = command[0];
+            args = command.slice(1);
+        } else {
+            cmd = command;
         }
         if (info) {
             this.info(command);
         }
         return new Promise((resolve, reject) => {
-            const options = { stdio: 'pipe' };
+            const options = {
+                stdio: 'pipe'
+            };
             if (cwd) {
                 options.cwd = cwd;
                 process.chdir(cwd);
             }
             const childProcess = this.isLinux()
-                ? spawn('/bin/bash', ['-c', command], options)
-                : spawn(command, options);
+                ? spawnSync('/bin/bash', ['-c', cmd].concat(args), options)
+                : spawnSync(cmd, args, options);
 
             let stdoutData = '';
             let stderrData = '';
             childProcess.stdout.on('data', (data) => {
+                console.log(`childProcess-data`)
                 const output = this.byteToStr(data);
                 if (info) {
                     this.info(output);
@@ -97,34 +106,40 @@ class Plattools extends Base {
                 stderrData += error + '\n';
             });
             childProcess.on('close', (code) => {
-                process.chdir(this.initialWorkingDirectory); // 切换回原始的系统工作目录
+                console.log(`childProcess-close`)
+                process.chdir(this.initialWorkingDirectory);
                 if (logname) {
                     this.easyLog(stdoutData, logname);
                 }
                 if (code === 0) {
-                    resolve(this.wrapEmdResult(true, stdoutData, null, 0));
+                    resolve(this.wrapEmdResult(true, stdoutData, null, 0, info));
                 } else {
                     resolve(
                         this.wrapEmdResult(false,
                             stdoutData,
                             stderrData,
-                            code)
+                            code, info)
                     );
                 }
             });
             childProcess.on('error', (err) => {
-                process.chdir(this.initialWorkingDirectory); // 切换回原始的系统工作目录
+                console.log(`childProcess-error`)
+                process.chdir(this.initialWorkingDirectory);
                 resolve(
                     this.wrapEmdResult(false,
                         stdoutData,
                         err,
-                        code)
+                        -1, info)
                 );
             });
         });
     }
 
-    wrapEmdResult(success = true, stdout = '', error = null, code = 0) {
+    wrapEmdResult(success = true, stdout = '', error = null, code = 0, info = true) {
+        if (info) {
+            this.info(this.byteToStr(stdout))
+            this.warn(this.byteToStr(error))
+        }
         return {
             success,
             stdout,
@@ -141,19 +156,15 @@ class Plattools extends Base {
         return this.execCmdSync(command, info, cwd, logname)
     }
 
-    execCmdSync(command, info = false, cwd = null, logname = null) {
+    execCmd(command, info = false, cwd = null, logname = null) {
         if (Array.isArray(command)) {
             command = command.join(" ");
         }
         if (info) {
-            this.info(command);
-<<<<<<< HEAD
-=======
-            this.info(`cwd`);
-            this.info(cwd);
->>>>>>> 7277f84d66832d12cb6601508e31e28ae87fed3f
+            this.info(`command\t: ${command}`);
+            this.info(`cwd\t: ${cwd}`);
         }
-        const options = { stdio: 'pipe' };
+        const options = { stdio: 'inherit' };
         let is_changed_dir = false
         if (cwd) {
             is_changed_dir = true
@@ -176,41 +187,173 @@ class Plattools extends Base {
         return resultText;
     }
 
-
-    async spawnAsync(command, info = false, cwd = null) {
-<<<<<<< HEAD
-=======
-        console.log(`command`,command)
->>>>>>> 7277f84d66832d12cb6601508e31e28ae87fed3f
+    async spawnAsync(command, info = true, cwd = null, logname = null, callback, timeout = 5000) {
+        let cmd = '';
+        let args = [];
+        command = command.split(/\s+/)
+        if (Array.isArray(command)) {
+            cmd = command[0];
+            args = command.slice(1);
+        } else {
+            cmd = command;
+        }
+        if (info) {
+            this.info(command);
+        }
+        let timer = null;
+        let callbackExecuted = false;
         return new Promise((resolve, reject) => {
-            const childProcess = spawn(command, [], {
-                shell: true,
-                cwd: cwd,
-                stdio: info ? 'inherit' : 'pipe'
+            const options = {
+                stdio: 'pipe'
+            };
+            if (cwd) {
+                options.cwd = cwd;
+                process.chdir(cwd);
+            }
+            let childProcess;
+            childProcess = this.isLinux()
+                ? spawn('/bin/bash', ['-c', cmd].concat(args), options)
+                : spawn(cmd, args, options);
+            let stdoutData = '';
+            let stderrData = '';
+            const resetTimer = () => {
+                if (timer !== null) {
+                    clearTimeout(timer);
+                }
+                timer = setTimeout(() => {
+                    if (!callbackExecuted) {
+                        callback(this.wrapEmdResult(true, stdoutData, null, 0, info));
+                        callbackExecuted = true;
+                        // childProcess.kill(); 
+                    }
+                }, timeout);
+            };
+            childProcess.stdout.on('data', (data) => {
+                resetTimer();
+                console.log(`childProcess-data`)
+                const output = this.byteToStr(data);
+                if (info) {
+                    this.info(output);
+                }
+                if (logname) {
+                    this.easyLog(output, logname);
+                }
+                stdoutData += output + '\n';
             });
-            childProcess.on('exit', (code) => {
+            childProcess.stderr.on('data', (data) => {
+                resetTimer();
+                console.log(`childProcess-data`)
+                const error = this.byteToStr(data);
+                if (info) {
+                    this.warn(error);
+                }
+                stderrData += error + '\n';
+            });
+            childProcess.on('close', (code) => {
+                console.log(`childProcess-close`)
+                process.chdir(this.initialWorkingDirectory);
+                if (logname) {
+                    this.easyLog(stdoutData, logname);
+                }
                 if (code === 0) {
-                    resolve();
+                    resolve(this.wrapEmdResult(true, stdoutData, null, 0, info));
                 } else {
-                    reject(new Error(`Command ${command} exited with code ${code}`));
+                    resolve(
+                        this.wrapEmdResult(false,
+                            stdoutData,
+                            stderrData,
+                            code, info)
+                    );
                 }
             });
-            if (!info) {
-                let output = '';
-                childProcess.stdout.on('data', (data) => {
-                    output += data;
-                });
-
-                childProcess.on('close', (code) => {
-                    if (code === 0) {
-                        resolve(output);
-                    } else {
-                        reject(new Error(`Command ${command} exited with code ${code}`));
-                    }
-                });
-            }
+            childProcess.on('error', (err) => {
+                console.log(`childProcess-error`)
+                process.chdir(this.initialWorkingDirectory);
+                resolve(
+                    this.wrapEmdResult(false,
+                        stdoutData,
+                        err,
+                        -1, info)
+                );
+            });
         });
     }
+
+    async spawnSync(command, info = true, cwd = null, logname = null) {
+        let cmd = '';
+        let args = [];
+        command = command.split(/\s+/)
+        if (Array.isArray(command)) {
+            cmd = command[0];
+            args = command.slice(1);
+        } else {
+            cmd = command;
+        }
+        if (info) {
+            this.info(command);
+        }
+        return new Promise((resolve, reject) => {
+            const options = {
+                stdio: 'pipe'
+            };
+            if (cwd) {
+                options.cwd = cwd;
+                process.chdir(cwd);
+            }
+            const childProcess = this.isLinux()
+                ? spawnSync('/bin/bash', ['-c', cmd].concat(args), options)
+                : spawnSync(cmd, args, options);
+
+            let stdoutData = '';
+            let stderrData = '';
+            childProcess.stdout.on('data', (data) => {
+                console.log(`childProcess-data`)
+                const output = this.byteToStr(data);
+                if (info) {
+                    this.info(output);
+                }
+                if (logname) {
+                    this.easyLog(output, logname);
+                }
+                stdoutData += output + '\n';
+            });
+            childProcess.stderr.on('data', (data) => {
+                const error = this.byteToStr(data);
+                if (info) {
+                    this.warn(error);
+                }
+                stderrData += error + '\n';
+            });
+            childProcess.on('close', (code) => {
+                console.log(`childProcess-close`)
+                process.chdir(this.initialWorkingDirectory);
+                if (logname) {
+                    this.easyLog(stdoutData, logname);
+                }
+                if (code === 0) {
+                    resolve(this.wrapEmdResult(true, stdoutData, null, 0, info));
+                } else {
+                    resolve(
+                        this.wrapEmdResult(false,
+                            stdoutData,
+                            stderrData,
+                            code, info)
+                    );
+                }
+            });
+            childProcess.on('error', (err) => {
+                console.log(`childProcess-error`)
+                process.chdir(this.initialWorkingDirectory);
+                resolve(
+                    this.wrapEmdResult(false,
+                        stdoutData,
+                        err,
+                        -1, info)
+                );
+            });
+        });
+    }
+
 
     async execByExplorer(command, info = false, cwd = null) {
         let cmd;

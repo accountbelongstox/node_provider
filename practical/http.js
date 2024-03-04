@@ -8,6 +8,7 @@ const net = require('net');
 const bodyParser = require('body-parser');
 const express = require('express');
 const expressWs = require('express-ws');
+const { porttool,env } = require('../../node_provider/utils.js');
 const {
     file,
     strtool,
@@ -387,28 +388,6 @@ class httpWidget {
         winapiWidget.hasAndAddListUserData(url)
     }
 
-    checkPort(port) {
-        return new Promise((resolve, reject) => {
-            const tester = net.createServer();
-            tester.once('error', (err) => {
-                if (err.code === 'EADDRINUSE') {
-                    tester.close(() => () => {
-                        return this.checkPort(port + 1).then(resolve).catch(e => { })
-                    });
-                } else {
-                    reject(err);
-                    resolve(null);
-                }
-            });
-
-            tester.once('listening', () => {
-                tester.close(() => resolve(port));
-            });
-
-            tester.listen(port);
-        });
-    }
-
     getServerPort() {
         return this.startPort
     }
@@ -418,6 +397,21 @@ class httpWidget {
         return `http://localhost:${port}`
     }
 
+    getFrontendServerUrl() {
+        const frontend_port = env.getEnv(`FRONTEND_PORT`)
+        return `http://localhost:${frontend_port}`
+    }
+
+    openFrontendServerUrl(openUrl) {
+        if (!openUrl) openUrl = this.getFrontendServerUrl()
+        openUrl = urltool.toOpenUrl(openUrl)
+        try{
+            const { shell } = require('electron');
+            shell.openExternal(openUrl);
+        }catch(e){
+            console.log(e)
+        }
+    }
     openServerUrl(openUrl) {
         if (!openUrl) openUrl = this.getServerUrl()
         openUrl = urltool.toOpenUrl(openUrl)
@@ -668,7 +662,7 @@ class httpWidget {
     }
 
     async startVueOrReactServer(port, distDir) {
-        port = await this.checkPort(port)
+        port = await porttool.checkPort(port)
         const server = http.createServer((request, response) => {
             return serveHandler(request, response, {
                 "public": distDir

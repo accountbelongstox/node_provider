@@ -14,8 +14,10 @@ const log = require('./util/log.js');
 const plattool = require('./util/plattool.js');
 const sysarg = require('./util/sysarg.js');
 const setenv = require('./util/setenv.js');
+const zip = require('./util/zip.js');
+const getnode = require('./util/getnode.js');
 const env = require('./util/env.js');
-
+const porttool = require('./util/porttool.js');
 
 module.exports = {
     toString: () => '[class Util]',
@@ -36,4 +38,7 @@ module.exports = {
     sysarg,
     setenv,
     env,
+    zip,
+    getnode,
+    porttool,
 };

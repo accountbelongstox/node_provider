@@ -2,17 +2,15 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-
 class setEnv {
     regType = ``
     constructor() {
-        this.regType = ''; 
+        this.regType = '';
         if (os.platform() === 'win32') {
             this.regType = 'REG_SZ';
         }
         this.regType = this.queryEnvironmentVariable();
     }
-
     getBackupTmpDir() {
         let tmpDir;
         if (os.platform() === 'win32') {
@@ -27,20 +25,17 @@ class setEnv {
 
         return tmpDir;
     }
-
     getBackupTmpFile() {
         const environmentDir = this.getBackupTmpDir();
         const timestamp = this.getTimestamp();
         const environmentFile = path.join(environmentDir, `path_${timestamp}.bak`);
         return environmentFile;
     }
-
     backupEnvPath(currentPath) {
         const backupTmpFile = this.getBackupTmpFile();
         const currentPathString = this.getCurrentPathString(currentPath);
         fs.writeFileSync(backupTmpFile, currentPathString);
     }
-
     getAction() {
         if (process.argv.length > 1) {
             return process.argv[2];
@@ -48,7 +43,6 @@ class setEnv {
             return null;
         }
     }
-
     getPathString() {
         if (process.argv.length > 2) {
             return process.argv[3];
@@ -56,7 +50,6 @@ class setEnv {
             return null;
         }
     }
-
     getTimestamp() {
         const now = new Date();
         const year = now.getFullYear().toString().padStart(4, '0');
@@ -67,52 +60,46 @@ class setEnv {
         const second = now.getSeconds().toString().padStart(2, '0');
         return `${year}${month}${day}_${hour}${minute}${second}`;
     }
-
     queryEnvironmentVariable() {
-    try {
-        let underscoreVariable;
-        if (os.platform() === 'win32') {
-            const command = 'reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v Path';
-            const result = execSync(command).toString();
-            const queryTable = result.split(/\s+/);
-            queryTable.splice(0, 3);
-            underscoreVariable = queryTable.find(item => item.includes('_'));
-        } else {
-            // 在 Linux 或 WSL 中读取环境变量
-            underscoreVariable = process.env.PATH;
-        }
+        try {
+            let underscoreVariable;
+            if (os.platform() === 'win32') {
+                const command = 'reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v Path';
+                const result = execSync(command).toString();
+                const queryTable = result.split(/\s+/);
+                queryTable.splice(0, 3);
+                underscoreVariable = queryTable.find(item => item.includes('_'));
+            } else {
+                // 在 Linux 或 WSL 中读取环境变量
+                underscoreVariable = process.env.PATH;
+            }
 
-        if (!underscoreVariable) {
-            throw new Error('Environment variable "Path" is empty');
+            if (!underscoreVariable) {
+                throw new Error('Environment variable "Path" is empty');
+            }
+
+            return underscoreVariable;
+        } catch (error) {
+            throw new Error(`Error querying environment variable: ${error.message}`);
         }
-        
-        return underscoreVariable;
-    } catch (error) {
-        throw new Error(`Error querying environment variable: ${error.message}`);
     }
-}
-
-
     getCurrentPath() {
-		const reg_command = `reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v Path`
+        const reg_command = `reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v Path`
         const result = execSync(reg_command).toString();
-		const PathsMatch = result.split(this.regType)
+        const PathsMatch = result.split(this.regType)
         const Paths = PathsMatch[1].trim()
         const cleanedPaths = Paths.split(/;+/).filter(path => path.trim() !== '').map(path => path.trim());
         const formattedPaths = cleanedPaths.map(p => this.normalizeWinPath(p));
         return formattedPaths;
     }
-
     getCurrentPathString(currentPath) {
         if (!currentPath) currentPath = this.getCurrentPath()
         const formattedPaths = currentPath.join(`;`)
         return formattedPaths;
     }
-
     normalizeWinPath(p) {
         return path.win32.normalize(p)
     }
-
     createEnvironmentDir() {
         if (!fs.existsSync(this.environmentDir)) {
             console.log('Creating environment directory...');
@@ -120,11 +107,9 @@ class setEnv {
             console.log('Environment directory created successfully.');
         }
     }
-
     backupCurrentPath() {
         fs.appendFileSync(this.environmentFile, `${this.currentPath}\r\n`);
     }
-
     addPath(newPath) {
         const currentPath = this.getCurrentPath()
         newPath = this.normalizeWinPath(newPath)
@@ -141,7 +126,6 @@ class setEnv {
             console.log(`The ${newPath} already exists in the environment.`);
         }
     }
-
     where(exename) {
         const paths = this.getCurrentPath();
         const regex = new RegExp(`^${exename.replace(/\.exe$/i, '')}(\\.exe|\\.bat)?$`, 'i');
@@ -157,11 +141,9 @@ class setEnv {
 
         return null;
     }
-
     showPath() {
         console.log(this.getCurrentPath());
     }
-
     removePath(pathToRemove) {
         const currentPath = this.getCurrentPath();
         pathToRemove = this.normalizeWinPath(pathToRemove);
@@ -178,7 +160,6 @@ class setEnv {
             console.log(`The ${pathToRemove} does not exist in the environment.`);
         }
     }
-
     isPathIncluded(pathToCheck) {
         const currentPath = this.getCurrentPath()
         pathToCheck = this.normalizeWinPath(pathToCheck)
@@ -188,7 +169,6 @@ class setEnv {
             return false
         }
     }
-
     start() {
         const action = this.getAction();
         const newPath = this.getPathString();

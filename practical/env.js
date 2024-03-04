@@ -15,7 +15,7 @@ class Env extends Base {
   constructor(rootDir = null, envName = ".env", delimiter = "=") {
     super()
     if (rootDir === null) {
-      rootDir = this.getCwd();
+      rootDir = process.cwd();
     } else {
       rootDir = file.resolvePath(rootDir);
     }

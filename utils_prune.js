@@ -15,6 +15,10 @@ const winston = require('winston');
 const plattool = require('./util/plattool');
 const sysarg = require('./util/sysarg');
 const env = require('./util/env.js');
+const getnode = require('./util/getnode.js');
+const zip = require('./util/zip.js');
+const porttool = require('./util/porttool.js');
+
 module.exports = {
     toString: () => '[class UtilPrune]',
     date,
@@ -32,5 +36,8 @@ module.exports = {
     plattool,
     log,
     sysarg,
-    env
+    env,
+    zip,
+    getnode,
+    porttool,
 };

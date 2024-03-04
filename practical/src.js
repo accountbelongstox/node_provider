@@ -7,11 +7,9 @@ const Util = require('../utils');
 let config = {}
 
 class Source  {
-
     setConfig() {
         config = conf
     }
-
     getDriverPathByChrome(driverType) {
         const chromePath = this.getBrowserDriverPath(driverType);
         const version = this.getDriverVersion(driverType);
@@ -30,16 +28,13 @@ class Source  {
         \tDriver name ${this.getDriverName()}
         \tChrome ${chromePath}
         \tDriver ${driverPath}`;
-
         console.log(seleniumInfo);
         return driverPath;
     }
-
     getDefaultImageFile() {
         let icon = Util.file.get_stylesheet(`img/default_app.png`)
         return icon
     }
-
     getBrowserPath(browser) {
         const browserRegs = {
             IE: 'SOFTWARE\\Clients\\StartMenuInternet\\IEXPLORE.EXE\\DefaultIcon',
@@ -70,7 +65,6 @@ class Source  {
 
         return null;
     }
-
     getBrowserDriverPath(driverType) {
         if (driverType === 'chrome') {
             return this.getChromePath();
@@ -78,7 +72,6 @@ class Source  {
             return this.getEdgeInstallPath();
         }
     }
-
     getEdgeInstallPath() {
         // Windows 下的 Microsoft Edge 安装路径可能在以下两个位置
         const possiblePaths = [
@@ -104,7 +97,6 @@ class Source  {
             return null;
         }
     }
-
     getChromePath() {
         let chromePath = this.comConfig.getGlobal('chrome_path');
 
@@ -125,16 +117,9 @@ class Source  {
 
         return chromePath;
     }
-
     isWindows() {
         return os.platform() === 'win32';
     }
-
-<<<<<<< HEAD
-
-    
-=======
->>>>>>> 7277f84d66832d12cb6601508e31e28ae87fed3f
     async downloadChromeBinary() {
         if (this.isWindows()) {
             const remoteUrl = this.comConfig.getGlobal('remote_url');
@@ -148,25 +133,15 @@ class Source  {
             const chromePath = this.comFile.searchFile(saveFilename, 'chrome.exe');
             return chromePath;
         } else {
-            // 添加软件包仓库密钥
             execSync('wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -');
-
-            // 添加软件包仓库
             execSync('sudo sh -c \'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list\'');
-
-            // 更新软件包列表
             execSync('sudo apt-get update');
-
-            // 安装 Google Chrome
             execSync('sudo apt-get install google-chrome-stable');
-
-            // 查找 Chrome 浏览器的地址
             const result = execSync('which google-chrome', { encoding: 'utf-8' });
             const chromePath = result.trim();
             return chromePath;
         }
     }
-
     async getChromeVersion() {
         const versionRe = /\d+\.\d+\.\d+\.\d+/;
         const isWindows = this.isWindows();
@@ -185,9 +160,7 @@ class Source  {
                 if (versionMatches && versionMatches.length > 0) {
                     return versionMatches[0];
                 }
-
                 try {
-                    // 从注册表中获得版本号
                     const key = await this.getWindowsRegistryValue('Software\\Google\\Chrome\\BLBeacon', 'version');
                     const registryVersion = versionRe.exec(key);
                     return registryVersion ? registryVersion[0] : this.comConfig.getGlobal('chrome_version');
@@ -209,7 +182,6 @@ class Source  {
             }
         }
     }
-
     async getRealDriverVersion(driverType) {
         console.log('driverType', driverType);
         driverType = this.comFile.dirNormal(driverType);
@@ -228,11 +200,9 @@ class Source  {
             return null;
         }
     }
-
     async getSupportedVersion(driverType) {
         const versionRe = /\d+\.\d+\.\d+\.\d+/;
         const remoteUrl = this.getDriverSupportUrl(driverType);
-
         try {
             const content = await this.comHttp.get(remoteUrl);
             const supportedVersions = content.match(versionRe) || [];
@@ -247,20 +217,16 @@ class Source  {
                 }
                 return 0;
             });
-
             return uniqueVersions;
         } catch (error) {
             console.error('Error while fetching supported versions:', error);
             return [];
         }
     }
-
     findVersion(versions, target) {
         const targetInt = Number(target.replace(/\./g, ''));
         const versionNumbers = versions.map(version => Number(version.replace(/\./g, '')));
-
         const index = this.binarySearch(versionNumbers, targetInt);
-
         if (index === 0) {
             return versions[0];
         } else if (index === versions.length) {
@@ -279,7 +245,6 @@ class Source  {
     binarySearch(arr, target) {//findVersion
         let left = 0;
         let right = arr.length - 1;
-
         while (left <= right) {
             const mid = Math.floor((left + right) / 2);
             if (arr[mid] === target) {
@@ -290,13 +255,10 @@ class Source  {
                 right = mid - 1;
             }
         }
-
         return left;
     }
-
     isSupportedVersion(driverType, version) {
         const supportedVersions = this.getSupportedVersion(driverType);
-
         if (!supportedVersions.includes(version)) {
             console.warn('Supported versions:');
             console.log(supportedVersions);
@@ -307,41 +269,32 @@ class Source  {
             return true;
         }
     }
-
     installDriver(version, driverType = 'chrome') {
         const isSupport = this.isSupportedVersion(driverType, version);
-
         if (isSupport !== true) {
             console.warn(`The ${driverType} ${version} is Not supported.`);
             return null;
         }
-
         let driverPath = this.comConfig.getGlobal('driverPath');
-
         if (driverPath) {
             if (!path.isAbsolute(driverPath)) {
                 const cwd = this.getCwd();
                 driverPath = path.join(cwd, driverPath);
             }
-
             if (fs.existsSync(driverPath)) {
                 return driverPath;
             }
         }
-
         driverPath = this.downDriver(version, driverType);
         return driverPath;
     }
-
     downDriver(version, driverType) {
         let fileName = 'chromedriver.exe';
         const remoteUrl = this.getDriverRemoteUrl(driverType);
-
         if (this.isWindows()) {
             if (driverType === 'chrome') {
                 fileName = 'chromedriver.exe';
             }
-
             const url = `${remoteUrl}${version}/chromedriver_win32.zip`;
             return this.downloadAndExtract(url, fileName);
         } else {
@@ -356,11 +309,9 @@ class Source  {
     downloadAndExtract(url, fileName) {//downDriver
         const downloadDir = path.join(__dirname, 'downloads');
         const downloadPath = path.join(downloadDir, fileName);
-
         if (!fs.existsSync(downloadDir)) {
             fs.mkdirSync(downloadDir);
         }
-
         return new Promise((resolve, reject) => {
             const writeStream = fs.createWriteStream(downloadPath);
             const decompressDir = path.join(downloadDir, 'extracted');
@@ -374,19 +325,14 @@ class Source  {
                     })
                     .catch(reject);
             });
-
         });
     }
-
-
     getDriverRemoteUrl(driverType) {
         return this.driverRemoteUrl[driverType] || null;
     }
-
     getDriverSupportUrl(driverType) {
         return this.driverSupportUrl[driverType] || null;
     }
-
     getDriverDownloadUrl(driverType, version) {
         const remoteUrl = this.driverRemoteUrl[driverType];
         if (driverType === 'chrome') {
@@ -411,13 +357,11 @@ class Source  {
         }
         return null;
     }
-
     async getDriverFromDown(downloadUrl) {
         const downUrl = {
             url: downloadUrl,
             extract: true
         };
-
         try {
             const driverPath = await this.comHttp.downs(downUrl, { extract: true, overwrite: true });
             return driverPath;
@@ -426,7 +370,6 @@ class Source  {
             return null;
         }
     }
-
     getDriverVersion(driverType) {
         if (driverType === 'chrome') {
             const version = this.getChromeVersion();
@@ -437,7 +380,6 @@ class Source  {
             return version;
         }
     }
-
     getDriverPathName(driverType) {
         if (this.isWindows()) {
             if (driverType === 'chrome') {
@@ -453,11 +395,7 @@ class Source  {
             }
         }
     }
-
-
-
 }
-
 Source.toString = () => '[class Source]';
 module.exports = new Source();
 

@@ -186,11 +186,6 @@ class Tool {
         return this.getParameters(para_key)
     }
 
-<<<<<<< HEAD
-
-
-=======
->>>>>>> 7277f84d66832d12cb6601508e31e28ae87fed3f
     mergeJSON(jsonA, jsonB) {
         for (const key in jsonB) {
             if (typeof jsonB[key] === 'object' && jsonB[key] !== null && !Array.isArray(jsonB[key])) {

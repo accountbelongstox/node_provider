@@ -1,10 +1,3 @@
-<<<<<<< HEAD
-#!/bin/bash
-timestamp=$(date +"%Y-%m-%d %H:%M:%S")
-git add .
-git commit -m "$timestamp"
-git push --set-upstream origin master
-=======
 @echo off
 setlocal
 REM YYYY-MM-DD HH:MM:SS
@@ -22,4 +15,3 @@ git commit -m "%timestamp%"
 git push --set-upstream origin master
 endlocal
         
->>>>>>> 7277f84d66832d12cb6601508e31e28ae87fed3f
