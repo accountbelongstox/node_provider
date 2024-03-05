@@ -1,4 +1,4 @@
-const {  exec } = require('child_process');
+const { exec, spawn } = require('child_process');
 const Base = require('../base/base');
 const net = require('net');
 
@@ -8,84 +8,168 @@ class Porttool extends Base {
         this.currentDir = process.cwd();
     }
 
-    async isPortInUse(port) {
+    isWindows() {
+        return process.platform === 'win32';
+    }
+
+    isLinux() {
+        return process.platform === 'linux';
+    }
+
+    async execCommand(command, info = true, cwd = null, logname = null) {
+        if (info) {
+            this.info(command);
+        }
         return new Promise((resolve, reject) => {
-            const netstatCommand = `netstat -ano | findstr :${port}`;
-            exec(netstatCommand, (error, stdout, stderr) => {
+            let options = {};
+            if (cwd) {
+                options.cwd = cwd;
+            }
+
+            exec(command, options, (error, stdout, stderr) => {
                 if (error) {
-                    reject(error);
-                    return;
-                }
-                const lines = stdout.trim().split('\n').map(line => line.trim().replace(/\r/g, ''));
-                let portLines = lines;
-                let isPortUsed = false;
-                let isIncludePort = false;
-                for (let i = 0; i < portLines.length; i++) {
-                    const parts = portLines[i].split(/\s+/); 
-                    let firstValue = parts[0];
-                    if(firstValue == "TCP")firstValue =  parts[1];
-                    if (firstValue.endsWith(`:${port}`)) {
-                        isIncludePort = true
+                    console.error(`exec error: ${error}`);
+                    if (logname) {
+                        this.easyLog(stderr, logname);
                     }
-                    const lastValue = parts[parts.length - 1];
-                    if (!isNaN(parseInt(lastValue, 10)) && parseInt(lastValue, 10) > 0) {
-                        isPortUsed = true;
-                        if (isIncludePort) {
-                            break
-                        }
+                    resolve(this.wrapEmdResult(false, stdout, stderr, error.code, info));
+                } else {
+                    if (logname) {
+                        this.easyLog(stdout, logname);
+                    }
+                    if (stderr) {
+                        console.warn(`exec stderr: ${stderr}`);
+                        resolve(this.wrapEmdResult(true, stdout, stderr, 0, info));
+                    } else {
+                        resolve(this.wrapEmdResult(true, stdout, null, 0, info));
                     }
                 }
-                isPortUsed = isIncludePort && isPortUsed
-                resolve(isPortUsed);
             });
+        });
+    }
+
+    async spawnSync(command, info = true, cwd = null, logname = null) {
+        let cmd = '';
+        let args = [];
+        command = command.split(/\s+/)
+        if (Array.isArray(command)) {
+            cmd = command[0];
+            args = command.slice(1);
+        } else {
+            cmd = command;
+        }
+        if (info) {
+            this.info(command);
+        }
+        return new Promise((resolve, reject) => {
+            const options = {
+                stdio: 'pipe'
+            };
+            if (cwd) {
+                options.cwd = cwd;
+                process.chdir(cwd);
+            }
+            const childProcess = this.isLinux()
+                ? spawn('/bin/bash', ['-c', cmd].concat(args), options)
+                : spawn(cmd, args, options);
+
+            let stdoutData = '';
+            let stderrData = '';
+            childProcess.stdout.on('data', (data) => {
+                const output = this.byteToStr(data);
+                if (info) {
+                    this.info(output);
+                }
+                if (logname) {
+                    this.easyLog(output, logname);
+                }
+                stdoutData += output + '\n';
+            });
+            childProcess.stderr.on('data', (data) => {
+                const error = this.byteToStr(data);
+                if (info) {
+                    this.warn(error);
+                }
+                stderrData += error + '\n';
+            });
+            childProcess.on('close', (code) => {
+                process.chdir(this.currentDir);
+                if (logname) {
+                    this.easyLog(stdoutData, logname);
+                }
+                if (code === 0) {
+                    resolve(this.wrapEmdResult(true, stdoutData, null, 0, info));
+                } else {
+                    resolve(
+                        this.wrapEmdResult(false,
+                            stdoutData,
+                            stderrData,
+                            code, info)
+                    );
+                }
+            });
+            childProcess.on('error', (err) => {
+                process.chdir(this.currentDir);
+                resolve(
+                    this.wrapEmdResult(false,
+                        stdoutData,
+                        err,
+                        -1, info)
+                );
+            });
+        });
+    }
+
+    async isPortInUse(port) {
+        return new Promise(async (resolve, reject) => {
+            const netstatCommand = `netstat -ano | findstr :${port}`;
+            const result = await this.execCommand(netstatCommand)
+            let stdout = result && result.stdout ? result.stdout : ``
+            if (!stdout) {
+                stdout = result && result.error ? result.error : ``
+            }
+            const lines = stdout.trim().split('\n').map(line => line.trim().replace(/\r/g, ''));
+            let portLines = lines;
+            let isPortUsed = false;
+            for (let i = 0; i < portLines.length; i++) {
+                const parts = portLines[i].split(/\s+/);
+                let isIncludePort = false;
+                let firstValue = parts[0];
+                if (firstValue == "TCP") firstValue = parts[1];
+                if (firstValue.endsWith(`:${port}`)) {
+                    isIncludePort = true
+                }
+                const lastValue = parts[parts.length - 1];
+                const usePid = parseInt(lastValue, 10)
+                if (!isNaN(usePid) && usePid > 0) {
+                    if (isIncludePort) {
+                        if(!Array.isArray(isPortUsed)) {
+                            isPortUsed = []
+                        }
+                        isPortUsed.push(usePid)
+                    }
+                }
+            }
+            resolve(isPortUsed);
         }).catch(error => {
             console.error("An error occurred while checking port:", error);
             return true;
         });
     }
+
     async killProcessByPort(port) {
-        return new Promise((resolve, reject) => {
-            // Execute netstat command to find processes using the specified port
-            const netstatCommand = `netstat -ano | findstr :${port}`;
-            exec(netstatCommand, (error, stdout, stderr) => {
-                if (error) {
-                    reject(error); // 使用 reject() 来处理错误
-                    return;
-                }
-                // Parse the netstat output to extract the PID and port
-                const lines = stdout.trim().split('\n').map(line => line.trim().replace(/\r/g, ''));
+        return new Promise(async (resolve, reject) => {
+            let pids = await this.isPortInUse(port)
+            if (pids) {
                 const processesToKill = [];
-                lines.forEach(line => {
-                    const lineParts = line.split(/\s+/);
-                    const pid = lineParts[lineParts.length - 1]; // PID is the last item
-                    if (pid.match(/^\d+$/) && parseInt(pid) > 0) {
-                        const processPort = lineParts[1].split(':')[1]; // Extract the port from the local address
-                        if (parseInt(processPort) === port) {
-                            processesToKill.push({ pid, port: processPort });
-                        }
-                    }
+                pids.forEach(pid => {
+                    processesToKill.push({ pid, port });
                 });
-
-                if (processesToKill.length === 0) {
-                    resolve(`No processes found using port ${port}`);
-                    return;
-                }
-
-                // Determine if taskkill command should be forced
                 const forceOption = processesToKill.length > 1 ? '/F' : '';
-                // Prepare taskkill command with PID(s)
-                const pids = processesToKill.map(process => process.pid).join(' /PID ');
                 const taskkillCommand = `taskkill ${forceOption} /PID ${pids}`;
-
-                // Execute taskkill command
-                exec(taskkillCommand, (error, stdout, stderr) => {
-                    if (error) {
-                        reject(error); // 使用 reject() 来处理错误
-                        return;
-                    }
-                    resolve(stdout.trim());
-                });
-            });
+                const stdout = await this.execCommand(taskkillCommand)
+                resolve(stdout);
+            }
         });
     }
 
@@ -127,6 +211,31 @@ class Porttool extends Base {
                 })
                 .listen(port);
         });
+    }
+    wrapEmdResult(success = true, stdout = '', error = null, code = 0, info = true) {
+        if (info) {
+            this.info(this.byteToStr(stdout))
+            this.warn(this.byteToStr(error))
+        }
+        return {
+            success,
+            stdout,
+            error,
+            code
+        }
+    }
+    byteToStr(astr) {
+        try {
+            astr = astr.toString('utf-8');
+            return astr;
+        } catch (e) {
+            astr = String(astr);
+            const isByte = /^b\'{0,1}/;
+            if (isByte.test(astr)) {
+                astr = astr.replace(/^b\'{0,1}/, '').replace(/\'{0,1}$/, '');
+            }
+            return astr;
+        }
     }
 }
 

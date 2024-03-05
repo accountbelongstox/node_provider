@@ -60,79 +60,44 @@ class Plattools extends Base {
             });
         });
     }
-    async execCmdSync(command, info = true, cwd = null, logname = null) {
-        let cmd = '';
-        let args = [];
-        command = command.split(/\s+/)
-        if (Array.isArray(command)) {
-            cmd = command[0];
-            args = command.slice(1);
-        } else {
-            cmd = command;
-        }
+
+    
+    async execCommand(command, info = true, cwd = null, logname = null) {
         if (info) {
             this.info(command);
         }
+    
         return new Promise((resolve, reject) => {
-            const options = {
-                stdio: 'pipe'
-            };
+            let options = {};
             if (cwd) {
                 options.cwd = cwd;
-                process.chdir(cwd);
             }
-            const childProcess = this.isLinux()
-                ? spawnSync('/bin/bash', ['-c', cmd].concat(args), options)
-                : spawnSync(cmd, args, options);
-
-            let stdoutData = '';
-            let stderrData = '';
-            childProcess.stdout.on('data', (data) => {
-                console.log(`childProcess-data`)
-                const output = this.byteToStr(data);
-                if (info) {
-                    this.info(output);
-                }
-                if (logname) {
-                    this.easyLog(output, logname);
-                }
-                stdoutData += output + '\n';
-            });
-            childProcess.stderr.on('data', (data) => {
-                const error = this.byteToStr(data);
-                if (info) {
-                    this.warn(error);
-                }
-                stderrData += error + '\n';
-            });
-            childProcess.on('close', (code) => {
-                console.log(`childProcess-close`)
-                process.chdir(this.initialWorkingDirectory);
-                if (logname) {
-                    this.easyLog(stdoutData, logname);
-                }
-                if (code === 0) {
-                    resolve(this.wrapEmdResult(true, stdoutData, null, 0, info));
+    
+            exec(command, options, (error, stdout, stderr) => {
+                if (error) {
+                    console.error(`exec error: ${error}`);
+                    if (logname) {
+                        this.easyLog(stderr, logname);
+                    }
+                    resolve(this.wrapEmdResult(false, stdout, stderr, error.code, info));
                 } else {
-                    resolve(
-                        this.wrapEmdResult(false,
-                            stdoutData,
-                            stderrData,
-                            code, info)
-                    );
+                    console.log(`exec stdout: ${stdout}`);
+                    if (logname) {
+                        this.easyLog(stdout, logname);
+                    }
+                    if (stderr) {
+                        console.warn(`exec stderr: ${stderr}`);
+                        resolve(this.wrapEmdResult(true, stdout, stderr, 0, info));
+                    } else {
+                        resolve(this.wrapEmdResult(true, stdout, null, 0, info));
+                    }
                 }
-            });
-            childProcess.on('error', (err) => {
-                console.log(`childProcess-error`)
-                process.chdir(this.initialWorkingDirectory);
-                resolve(
-                    this.wrapEmdResult(false,
-                        stdoutData,
-                        err,
-                        -1, info)
-                );
             });
         });
+    }
+
+    async execCmdSync(command, info = true, cwd = null, logname = null) {
+        return await this.execCommand(command, info , cwd , logname )
     }
 
     wrapEmdResult(success = true, stdout = '', error = null, code = 0, info = true) {
@@ -148,12 +113,12 @@ class Plattools extends Base {
         }
     }
 
-    async cmdAsync(command, info = true, cwd = null, logname = null) {
-        return await this.execCmd(command, info, cwd, logname)
+    async cmdSync(command, info = true, cwd = null, logname = null) {
+        return await this.execCommand(command, info , cwd , logname )
     }
 
-    cmdSync(command, info = true, cwd = null, logname = null) {
-        return this.execCmdSync(command, info, cwd, logname)
+    async cmdAsync(command, info = true, cwd = null, logname = null) {
+        return await this.execCmd(command, info, cwd, logname)
     }
 
     execCmd(command, info = false, cwd = null, logname = null) {
@@ -353,7 +318,6 @@ class Plattools extends Base {
             });
         });
     }
-
 
     async execByExplorer(command, info = false, cwd = null) {
         let cmd;
