@@ -21,8 +21,6 @@ class Socket {
         const ip = params.get('ip');
         return ip || '127.0.0.1';
     }
-<<<<<<< HEAD
-=======
     
     get_remote_url() {
         const params = new URLSearchParams(window.location.search);
@@ -30,8 +28,6 @@ class Socket {
         return remoteUrl || '127.0.0.1';
     }
     
->>>>>>> 7277f84d66832d12cb6601508e31e28ae87fed3f
-
     async connect() {
         if (this.socket) {
             console.log(`socket already exists`);
