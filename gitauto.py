@@ -118,6 +118,7 @@ git diff --name-only --diff-filter=U
                 if directory.endswith(skip_dir):
                     return False
             return True
+        self.git_commmit_directory(root_directory)
         
         for item in os.listdir(root_directory):
             item_path = os.path.join(root_directory, item)
