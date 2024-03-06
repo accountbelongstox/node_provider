@@ -18,6 +18,7 @@ const zip = require('./util/zip.js');
 const getnode = require('./util/getnode.js');
 const env = require('./util/env.js');
 const porttool = require('./util/porttool.js');
+const httptool = require('./util/httptool.js');
 
 module.exports = {
     toString: () => '[class Util]',
@@ -32,7 +33,7 @@ module.exports = {
     platform,
     htmlparse,
     math:math_,
-    conf:conf,
+    conf,
     plattool,
     log,
     sysarg,
@@ -41,4 +42,5 @@ module.exports = {
     zip,
     getnode,
     porttool,
+    httptool,
 };

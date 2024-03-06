@@ -31,7 +31,6 @@ class StrTool {
         }
     }
 
-
     createString(length = 10) {
         const letters = 'abcdefghijklmnopqrstuvwxyz';
         let result = '';
@@ -39,12 +38,6 @@ class StrTool {
             result += letters.charAt(Math.floor(Math.random() * letters.length));
         }
         return result;
-    }
-
-    get_md5(value) {
-        const hash = crypto.createHash('md5');
-        hash.update(value);
-        return hash.digest('hex');
     }
 
     get_id(value, pre) {
@@ -59,6 +52,12 @@ class StrTool {
         if (!value) value = this.createString(128)
         const _id = this.get_id(value);
         return _id;
+    }
+
+    get_md5(value) {
+        const hash = crypto.createHash('md5');
+        hash.update(value);
+        return hash.digest('hex');
     }
 
     createTime() {

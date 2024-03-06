@@ -429,13 +429,11 @@ class File extends Base {
         const truncatedParts = parts.slice(0, levels + 1);
         return truncatedParts.join(path.sep);
     }
-
     replaceDir(src, new_pre, level) {
         src = this.slicePathLevels(src, level)
         src = path.join(new_pre, src)
         return src
     }
-
     getDrive(pf) {
         const match = /^[a-zA-Z]+/.exec(pf);
         if (match) {
@@ -443,7 +441,6 @@ class File extends Base {
         }
         return null;
     }
-
     isDrive(pf, drive) {
         const pf_drive = this.getDrive(pf)
         if (pf_drive == drive) {
@@ -451,14 +448,12 @@ class File extends Base {
         }
         return false;
     }
-
     isRootPath(path) {
         const cleanedPath = path.replace(/\/$/, '').toLowerCase();
         const windowsRootPattern = /^[a-z]:$/;
         const unixRootPattern = /^\/$/;
         return windowsRootPattern.test(cleanedPath) || unixRootPattern.test(cleanedPath);
     }
-
     isFile(filename) {
         if (!filename || typeof filename != "string") {
             return false
@@ -472,7 +467,6 @@ class File extends Base {
         }
         return false
     }
-
     isFileAsync(filename, callback) {
         if (!filename || typeof filename !== "string") {
             callback(false);
@@ -756,8 +750,7 @@ class File extends Base {
             json_text = JSON.stringify(json_text, {}, 2);
         }
         let dirname = path.dirname(file_name)
-        console.log(`file_name ${file_name}`)
-        console.log(`dirname ${dirname}`)
+        console.log(`saveJSON: ${file_name}`)
         this.mkdir(dirname)
         fs.writeFileSync(file_name, json_text, 'utf-8');
     }
@@ -798,11 +791,6 @@ class File extends Base {
         } catch (error) {
             return false;
         }
-    }
-
-    mkbasedir(directoryPath) {
-        directoryPath = path.dirname(directoryPath)
-        return this.mkdir(directoryPath)
     }
 
     getRoot(filename) {
@@ -949,6 +937,10 @@ class File extends Base {
         }
     }
 
+    mkbasedir(directoryPath) {
+        directoryPath = path.dirname(directoryPath)
+        return this.mkdir(directoryPath)
+    }
 
     mkdir(dirPath) {
         if (!fs.existsSync(dirPath)) {
@@ -1577,7 +1569,6 @@ class File extends Base {
             return null
         }
     }
-
     openNetworkFile(hoststr, fp) {
         let { url, usr, pwd } = this.getShareStringUserPassword(hoststr)
         let { hostname, pathname } = this.parseShareDirHostAndPath(url)
@@ -1589,7 +1580,6 @@ class File extends Base {
         }
         return ``
     }
-
     getNetworkPath(hoststr, fp) {
         let { url, usr, pwd } = this.getShareStringUserPassword(hoststr)
         let { hostname, pathname } = this.parseShareDirHostAndPath(url)
@@ -1598,7 +1588,6 @@ class File extends Base {
         if (fp) network_map_localdir = path.join(network_map_localdir, fp)
         return network_map_localdir
     }
-
     openNetworkJSON(hoststr, fp) {
         fp = this.openNetworkFile(hoststr, fp)
         try {
@@ -1608,7 +1597,6 @@ class File extends Base {
         }
         return fp
     }
-
     replacePathByLevel(oldPath, n, newPath) {
         const segments = oldPath.split(/[\/\\]+/);
         if (n <= 0 || n > segments.length) {
@@ -1616,7 +1604,6 @@ class File extends Base {
         }
         return this.getNormalPath(path.join(newPath, segments.slice(n).join('/')));
     }
-
     getLevelPath(path, n, x) {
         const segments = path.split(/[\/\\]+/);
         if (x === undefined) {
@@ -1625,30 +1612,25 @@ class File extends Base {
             return segments.slice(n, x + 1).join('/');
         }
     }
-
     getSafeFilename(url) {
         const possibleFilename = url.split('/').pop();
         const invalidCharacters = /[<>:"/\\|?*\x00-\x1F\s]+/g;
         const safeFilename = possibleFilename.replace(invalidCharacters, '_');
         return safeFilename;
     }
-
     isExecutable(filePath) {
         const extname = path.extname(filePath).toLowerCase();
         const executableExtensions = ['.exe', '.bat', '.cmd', '.ps1', '.vbs'];
         return executableExtensions.includes(extname);
     }
-
     containsAllDirs(rootPath, dirs) {
         const contents = fs.readdirSync(rootPath);
         return dirs.every(dir => contents.includes(dir));
     }
-
     getDefaultDownloadPath() {
         const userProfile = process.env.USERPROFILE || process.env.HOME || os.tmpdir();
         return path.join(userProfile, 'Downloads');
     }
-
     findFileUpward(fileName, currentDir = path.dirname(__dirname)) {
         const filePath = path.join(currentDir, fileName);
 
@@ -1663,7 +1645,6 @@ class File extends Base {
             }
         }
     }
-
     findFileDownward(fileName, currentDir = path.dirname(__dirname)) {
         const filePath = path.join(currentDir, fileName);
         if (fs.existsSync(filePath)) {
@@ -1682,7 +1663,6 @@ class File extends Base {
             return null;
         }
     }
-
     findFilesUpward(fileNames, currentDir = path.dirname(__dirname)) {
         const foundFiles = fileNames.every(fileName => fs.existsSync(path.join(currentDir, fileName)));
 
@@ -1697,7 +1677,6 @@ class File extends Base {
             }
         }
     }
-
     findFilesDownward(fileNames, currentDir = path.dirname(__dirname)) {
         const foundFiles = fileNames.every(fileName => fs.existsSync(path.join(currentDir, fileName)));
         if (foundFiles) {
@@ -1714,7 +1693,6 @@ class File extends Base {
             return null;
         }
     }
-
     searchUpward(fileNames) {
         const currentDirectory = __dirname;
         let foundFilePath = null;
@@ -1740,7 +1718,6 @@ class File extends Base {
         findFileUpward(currentDirectory);
         return foundFilePath;
     }
-
     searchDownward(directory, fileNames) {
         let foundFilePath = null;
         const findFileDownward = (currentDirectory) => {
@@ -1758,6 +1735,20 @@ class File extends Base {
         };
         findFileDownward(directory);
         return foundFilePath;
+    }
+    getExtension(filePath) {
+        return path.extname(filePath);
+    }
+    replaceExtension(filePath, newExtension) {
+        const fileName = path.basename(filePath);
+        const originalExtension = path.extname(filePath);
+        if (originalExtension === '') {
+            const newFilePath = `${filePath}.${newExtension}`;
+            return newFilePath;
+        } else {
+            const newFilePath = path.join(path.dirname(filePath), `${fileName.replace(originalExtension, '')}.${newExtension}`);
+            return newFilePath;
+        }
     }
 }
 File.toString = () => '[class File]';

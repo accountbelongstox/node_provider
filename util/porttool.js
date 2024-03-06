@@ -172,7 +172,6 @@ class Porttool extends Base {
             }
         });
     }
-
     async checkPort(port) {
         return new Promise((resolve, reject) => {
             port = parseInt(port);

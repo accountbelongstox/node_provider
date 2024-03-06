@@ -1,7 +1,11 @@
 
 'use strict';
+const Base = require('../base/base');
 
-class JSON_ {
+class JSON_ extends Base {
+    constructor() {
+        super()
+    }
 
     copy(originJSON,option = {}) {
         let optionCopy = { ...originJSON, ...option };

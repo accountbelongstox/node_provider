@@ -18,6 +18,7 @@ const env = require('./util/env.js');
 const getnode = require('./util/getnode.js');
 const zip = require('./util/zip.js');
 const porttool = require('./util/porttool.js');
+const httptool = require('./util/httptool.js');
 
 module.exports = {
     toString: () => '[class UtilPrune]',
@@ -40,4 +41,5 @@ module.exports = {
     zip,
     getnode,
     porttool,
+    httptool,
 };
