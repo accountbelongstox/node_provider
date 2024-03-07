@@ -13,7 +13,7 @@ const {
     gdir,
     env,
 } = require('../globalvars.js');
-
+let eggSocket = null, eggSocketServer = null
 const encyclopedia = require('../model/encyclopedia.js').getEncyclopedia();
 
 let debug_send_event = false
@@ -155,63 +155,63 @@ class Httptool extends Base {
         let compare = await this.compareFileSizes(remoteUrl, localPath)
         return compare
     }
+    downloadFile(url, dest, progressCallback) {
+        let lastCallbackTime = 0;
 
-    get_file(url, dest) {
-        return new Promise(async (resolve, reject) => {
+        return new Promise((resolve, reject) => {
             if (!dest) {
-                dest = this.getDefaultDownloadFileDir(url)
+                dest = this.getDefaultDownloadFileDir(url);
             }
-            let result = {
-                dest
-            }
-            let startTime = Date.now();
-            if (fs.existsSync(dest)) {
-                let compare = await this.compareFileSizes(url, dest)
-                if (compare) {
-                    result.success = true
-                    result.usetime = Date.now() - startTime
-                    return resolve(result)
-                }
-            }
-            this.mkbasedir(dest) // 此处可能需要更改，避免变量名冲突
+            const startTime = Date.now();
             const protocol = url.startsWith('https') ? https : http;
-            const fileStream = fs.createWriteStream(dest); // 更改变量名
+            const fileStream = fs.createWriteStream(dest);
             const req = protocol.get(url, res => {
                 if (res.statusCode !== 200) {
-                    result.dest = false
-                    result.success = false
-                    result.usetime = Date.now() - startTime
-                    resolve(result);
+                    fileStream.close();
+                    fs.unlink(dest, () => {
+                        const message = `Failed to download file from ${url}. Status code: ${res.statusCode}`
+                        const error = new Error(message);
+                        console.error(error);
+                        progressCallback && progressCallback(-1, -1, -1,message);
+                        resolve({ dest: null, success: false, usetime: Date.now() - startTime });
+                    });
                     return;
                 }
-                res.pipe(fileStream); // 更改变量名
-                fileStream.on('finish', () => { // 更改变量名
-                    fileStream.close(); // 更改变量名
-                    result.success = true
-                    result.usetime = Date.now() - startTime
-                    resolve(result)
+                const totalSize = parseInt(res.headers['content-length'], 10);
+                let downloadedSize = 0;
+                res.on('data', chunk => {
+                    downloadedSize += chunk.length;   
+                    const currentTime = Date.now();
+                    if (progressCallback && currentTime - lastCallbackTime >= 1000) {
+                        const percentage = totalSize > 0 ? (downloadedSize / totalSize) * 100 : 0;
+                        progressCallback(percentage, totalSize, downloadedSize);
+                        lastCallbackTime = currentTime;
+                    }
+                });
+                res.pipe(fileStream);
+                fileStream.on('finish', () => {
+                    fileStream.close();
+                    progressCallback && progressCallback(100, totalSize, downloadedSize); 
+                    resolve({ dest, success: true, usetime: Date.now() - startTime });
                 });
             });
             req.on('error', error => {
-                fs.unlink(dest);
-                result.dest = null
-                result.success = false
-                result.usetime = Date.now() - startTime
-                resolve(result);
+                fs.unlink(dest, () => {
+                    console.error(`Error downloading file from ${url}: ${error.message}`);
+                    progressCallback && progressCallback(-1, -1, -1);
+                    resolve({ dest: null, success: false, usetime: Date.now() - startTime });
+                });
             });
-            fileStream.on('error', error => { // 更改变量名
-                console.log(`error`)
-                console.log(error)
-                fs.unlink(dest);
-                result.dest = null
-                result.success = false
-                result.usetime = Date.now() - startTime
-                resolve(result);
+            fileStream.on('error', error => {
+                fs.unlink(dest, () => {
+                    console.error(`Error writing file ${dest}: ${error.message}`);
+                    progressCallback && progressCallback(-1, -1, -1); // 返回 -1 表示错误
+                    resolve({ dest: null, success: false, usetime: Date.now() - startTime });
+                });
             });
             req.end();
-        }).catch((err) => { console.log(err) })
+        });
     }
-
 
     async download(url, downloadDir) {
         if (!downloadDir) downloadDir = winapiWidget.getDocumentsDir()
@@ -220,7 +220,7 @@ class Httptool extends Base {
         if (!downloadDir.endsWith(downname)) {
             downloadDir = path.join(downloadDir, downname)
         }
-        await this.get_file(url, downloadDir);
+        await this.downloadFile(url, downloadDir);
         return downloadDir
     }
 
@@ -339,7 +339,8 @@ class Httptool extends Base {
 
     getDefaultDownloadFileDir(url) {
         let filename = this.getSaveFilename(url)
-        let temp_dir = winapiWidget.getDownloadsDir(`.deskmanager_temp`)
+        let temp_dir = gdir.getDownloadDir()
+        console.log(temp_dir, filename)
         filename = path.join(temp_dir, filename)
         return filename
     }
@@ -360,7 +361,7 @@ class Httptool extends Base {
             }
         }
         if (!out) out = downloadFileName
-        this.get_file(url, downloadFileName).then((result) => {
+        this.downloadFile(url, out).then((result) => {
             let dest = result.dest
             if (result.dest) {
                 zipWidget.putUnZipTask(
@@ -687,6 +688,40 @@ class Httptool extends Base {
         }
     }
 
+    async eggSocket(method = null, params = null, callback = null, exclude = {}) {
+        try {
+            if (!eggSocket) {
+                eggSocket = require('ee-core/socket');
+                if (!eggSocketServer) {
+                    eggSocketServer = eggSocket.getSocketServer();
+                }
+            }
+            if (method) {
+                if (!params) {
+                    params = method;
+                    method = null;
+                }
+                if (params) {
+                    params = this.toJSON(params, 10, 0, new Set(), exclude);
+                    let data = {
+                        method,
+                        params
+                    };
+                    eggSocketServer.io.emit("cl", data);
+                } else {
+                    console.log(`Params is empty. Cannot emit socket event.`);
+                }
+            } else {
+                console.log(`Method not provided. Cannot emit socket event.`);
+            }
+
+            if (callback) callback();
+        } catch (error) {
+            console.error(`Error in eggSocket:`);
+            console.log(error);
+        }
+    }
+
     sendToWebSocket(event_name, data, rawData, toAll = true) {
         let wsClientFingerprint = null
         if (rawData) {
@@ -889,6 +924,58 @@ class Httptool extends Base {
             tester.listen(port, 'localhost');
         });
     }
+
+    toJSON(data, maxDepth = 100, currentDepth = 0, seen = new Set(), exclude = {}) {
+        if (typeof data === 'string') {
+            return this.strToJSON(data)
+        } else {
+            return this.serializeData(data, maxDepth, currentDepth, seen, exclude)
+        }
+    }
+    strToJSON(data) {
+        if (Buffer.isBuffer(data)) {
+            data = data.toString('utf-8');
+        }
+        try {
+            data = JSON.stringify(data, null, indent);
+            return data
+        } catch (e) {
+            console.log('strToJSON');
+            console.log(e);
+            return {}
+        }
+    }
+    serializeData(data, maxDepth = 100, currentDepth = 0, seen = new Set(), exclude = {}) {
+        function serialize(obj, maxDepth = 100, currentDepth = 0, seen = new Set(), exclude = {}) {
+            if (currentDepth >= maxDepth) { return null; }
+            if (obj === null || typeof obj !== 'object') { return obj; }
+            if (seen.has(obj)) { return null; }
+            seen.add(obj);
+            let result = Array.isArray(obj) ? [] : {};
+            for (let key in obj) {
+                if (obj.hasOwnProperty(key)) {
+                    let value = obj[key];
+                    if (exclude.hasOwnProperty(key)) {
+                        if (exclude[key].value != undefined) {
+                            result[key] = exclude[key].value;
+                        }
+                        continue;
+                    }
+                    if (typeof value === 'function') {
+                        result[key] = null;
+                        continue;
+                    }
+                    result[key] = serialize(value, maxDepth, currentDepth + 1, seen, exclude);
+                }
+            }
+            seen.delete(obj);
+            return result;
+        }
+
+        data = serialize(data, maxDepth, currentDepth, seen, exclude)
+        return data
+    }
+
 }
 
 module.exports = new Httptool()

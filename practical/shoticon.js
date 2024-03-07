@@ -8,9 +8,10 @@ const winShortcut = require('windows-shortcuts');
 const { atob } = require('atob');
 const { file, strtool, httptool, tool } = require('../utils.js');
 const { gdir, env } = require('../globalvars.js');
+const { Console } = require('console');
 let pngImgToIco;
 
-const icon_width = env.getEnv('ICON_WIDTH', 40)
+const icon_width = parseInt(env.getEnv('DESKTOP_ICON_WIDTH', 50));
 
 const config = {}
 const ShortcutQureyAsync = util.promisify(winShortcut.query);
@@ -29,6 +30,8 @@ class Main {
     ]
     localIconCache = null
     iconTmpDir = gdir.getLocalDir()
+    converToError = []
+    converToErrorImgs = []
 
     constructor() {
     }
@@ -269,9 +272,10 @@ class Main {
             const item = jsonData[index];
             const softwareList = item['softwareList'];
             const groupname = item.groupname;
-            const gid =  this.genGid(groupname);
+            const gid = this.genGid(groupname);
             jsonData[index].border = tool.getRandomItem(borders)
             jsonData[index].gid = gid
+            jsonData[index].icon_width = icon_width
             for (let i = 0; i < softwareList.length; i++) {
                 const softwareItem = softwareList[i];
                 const basename = softwareItem.basename;
@@ -511,15 +515,15 @@ class Main {
         let IconFile = gdir.getLocalFile('soft_icons.json');
         return IconFile
     }
-    saveLocalSoftlistJSON(iconsJson) { 
+    saveLocalSoftlistJSON(iconsJson) {
         let IconFile = this.getSoftCacheFile();
         file.saveJSON(IconFile, iconsJson)
     }
-    readLocalSoftlistJSON(){
+    readLocalSoftlistJSON() {
         let IconFile = this.getSoftCacheFile();
         if (!file.isFile(IconFile)) {
             return null
-        } 
+        }
         let iconsJson = file.readJSON(IconFile)
         return iconsJson
     }
@@ -546,14 +550,15 @@ class Main {
             const item = newJsonData[index];
             const softwareList = item['softwareList'];
             const groupname = item['groupname'];
-            if (!this.hasGroupName(groupname, groupnameOld)) {
+            const hasGroupName = this.hasGroupName(groupname, groupnameOld)
+            if (!hasGroupName) {
                 jsonData.push(item)
             } else {
                 const softs = this.getSoftNamesByGroup(groupname, jsonData)
                 for (let i = 0; i < softwareList.length; i++) {
                     const softwareItem = softwareList[i];
                     const basename = softwareItem.basename;
-                    if (!this.hasSoftByGroup(basename,softs)) {
+                    if (!this.hasSoftByGroup(basename, softs)) {
                         jsonData[index].softwareList.push(softwareItem)
                     }
                 }
@@ -563,7 +568,7 @@ class Main {
     }
     hasGroupName(groupname, groupnames, jsonData) {
         if (!groupnames) groupnames = this.getGroupNames(jsonData)
-        if (groupname in groupnames) {
+        if (groupnames.includes(groupname) ) {
             return true
         }
         return false
@@ -579,7 +584,7 @@ class Main {
     }
     hasSoftByGroup(basename, softs, groupname, jsonData) {
         if (!softs) softs = this.getSoftNamesByGroup(groupname, jsonData)
-        if (basename in softs) {
+        if ( softs.includes(basename)) {
             return true
         }
         return false
@@ -633,7 +638,7 @@ class Main {
         }
         return iconsJson
     }
-    
+
     async generateIconJson() {
         const iconJson = await this.getShortcutIcon(this.iconTmpDir);
     }
@@ -746,6 +751,10 @@ class Main {
         if (!pngImgToIco) {
             pngImgToIco = require('png-to-ico');
         }
+        const baseImgPath = path.basename(pngFilePath)
+        if(this.converToErrorImgs.includes(baseImgPath)){
+            return 
+        }
         pngImgToIco(pngFilePath)
             .then(buf => {
                 fs.writeFileSync(outputIcoFilePath, buf);
@@ -754,9 +763,16 @@ class Main {
                 }
             })
             .catch((error) => {
-                console.error('Error while converting PNG to ICO:', pngFilePath);
+                this.converToErrorImgs.push(baseImgPath)
+                this.converToError.push(baseImgPath)
+                if (this.converToError.length > 100) {
+                    console.error('Error while converting PNGs to ICO:');
+                    console.log(this.converToError);
+                    this.converToError = []
+                }
             });
     }
+
     base64ToPng(base64String, outputFilePath) {
         const base64Data = base64String.replace(/^data:image\/\w+;base64,/, '');
         const binaryData = Buffer.from(base64Data, 'base64');
@@ -777,21 +793,20 @@ class Main {
                 let imgname_by_ico = file.replaceExtension(basename, `ico`)
                 const pngPath = path.join(iconsCacheDir, imgname_by_png)
                 const iconPath = path.join(iconsCacheDir, imgname_by_ico)
- 
+
                 if (iconBase64) {
                     if (!file.isFile(iconPath)) {
                         this.base64ToPng(iconBase64, pngPath)
                         this.pngImToIco(pngPath, iconPath, true)
                     }
                 }
-                if(!iconImgPath){
+                if (!iconImgPath) {
                     jsonData[index].softwareList[i].iconImgPath = iconPath
                 }
             }
         }
         return jsonData
     }
-     
     checkIconFileIsExists(jsonData) {
         const appDir = env.getEnv('DESKTOP_APP_DIR')
         for (let index = 0; index < jsonData.length; index++) {
@@ -801,13 +816,11 @@ class Main {
                 const softwareItem = softwareList[i];
 
 
-
                 let iconPath = softwareItem.iconPath;
                 let target = softwareItem.target;
                 let exe_path = softwareItem.path;
- 
                 jsonData[index].softwareList[i].appDir = appDir
-                jsonData[index].softwareList[i].isExist = file.isFile(target)
+                jsonData[index].softwareList[i].icon_width = icon_width
 
                 if (appDir) {
                     if (!file.isAbsolute(iconPath)) {
@@ -817,13 +830,16 @@ class Main {
                     if (!file.isAbsolute(exe_path)) {
                         exe_path = path.join(appDir, exe_path)
                         jsonData[index].softwareList[i].path = exe_path
-                    }
+                    } 
                     if (!file.isAbsolute(target)) {
                         target = path.join(appDir, target)
                         jsonData[index].softwareList[i].target = target
                     }
                 }
-                
+
+                if (file.isAbsolute(jsonData[index].softwareList[i].target)) {
+                    jsonData[index].softwareList[i].isExist = file.isFile(jsonData[index].softwareList[i].target)
+                }
                 // let is_local = softwareItem.is_local
                 // if (is_local) {
                 //     gdir.getLocalDir()

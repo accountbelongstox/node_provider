@@ -52,7 +52,6 @@ class Tool {
             callback = message
             message = null
         }
-        // 将命令字符串拆分为基础命令和参数
         const parts = command.split(/\s+/g);
         const cmd = parts[0];
         const args = parts.slice(1);

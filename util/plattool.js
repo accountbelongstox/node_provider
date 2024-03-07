@@ -66,13 +66,12 @@ class Plattools extends Base {
         if (info) {
             this.info(command);
         }
-    
+
         return new Promise((resolve, reject) => {
             let options = {};
             if (cwd) {
                 options.cwd = cwd;
             }
-    
             exec(command, options, (error, stdout, stderr) => {
                 if (error) {
                     console.error(`exec error: ${error}`);
@@ -272,7 +271,6 @@ class Plattools extends Base {
             let stdoutData = '';
             let stderrData = '';
             childProcess.stdout.on('data', (data) => {
-                console.log(`childProcess-data`)
                 const output = this.byteToStr(data);
                 if (info) {
                     this.info(output);
@@ -290,7 +288,6 @@ class Plattools extends Base {
                 stderrData += error + '\n';
             });
             childProcess.on('close', (code) => {
-                console.log(`childProcess-close`)
                 process.chdir(this.initialWorkingDirectory);
                 if (logname) {
                     this.easyLog(stdoutData, logname);

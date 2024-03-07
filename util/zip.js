@@ -1,4 +1,6 @@
 const { exec, execSync } = require('child_process');
+const { spawn } = require('child_process');
+
 const path = require('path');
 const fs = require('fs');
 const Base = require('../base/base');
@@ -58,7 +60,7 @@ class Zip extends Base {
 
     get7zExeName() {
         let exeFile = `7zz`
-        if(this.isWindows()){
+        if (this.isWindows()) {
             exeFile = `7z.exe`
         }
         return exeFile
@@ -67,10 +69,10 @@ class Zip extends Base {
     get7zExe() {
         let folder = `linux`
         let exeFile = this.get7zExeName()
-        if(this.isWindows()){
+        if (this.isWindows()) {
             folder = `win32`
         }
-        return path.join(this.libraryDir,`${folder}/${exeFile}`)
+        return path.join(this.libraryDir, `${folder}/${exeFile}`)
     }
 
     mkdirSync(directoryPath) {
@@ -105,7 +107,7 @@ class Zip extends Base {
         }
         try {
             const stats = fs.statSync(fp);
-            return stats.mtime.getTime(); 
+            return stats.mtime.getTime();
         } catch (error) {
             console.error(`Error getting modification time: ${error.message}`);
             return 0;
@@ -121,7 +123,7 @@ class Zip extends Base {
             const fileSizeInBytes = stats.size;
             return fileSizeInBytes;
         } catch (error) {
-            return -1; 
+            return -1;
         }
     }
 
@@ -162,23 +164,50 @@ class Zip extends Base {
         return zipFilePath
     }
 
-    async addToPendingTasks(command, callback) {
+    async addToPendingTasks(command, callback, processCallback) {
         this.concurrentTasks++;
-        let startTime = new Date();
-        exec(command, (error, stdout, stderr) => {
-            if (error) {
-                this.log(`Error compressing: ${error.message}`);
-            } else if (stdout) {
-                this.log(`StdError compressing: ${stderr.toString()}`);
-            }
-            if (callback) callback(new Date() - startTime)
+        this.execBySpawn(command, callback, processCallback);
+    }
+
+    execBySpawn(command, callback, processCallback) {
+        const startTime = new Date();
+        const child = spawn(command, { shell: true });
+
+        child.stdout.on('data', (data) => {
+            data = this.byteToStr(data)
+            if (processCallback) processCallback(data);
         });
+
+        child.stderr.on('data', (data) => {
+            data = this.byteToStr(data)
+            console.error(`Error: ${data}`);
+            if (processCallback) processCallback(-1);
+        });
+
+        child.on('close', (code) => {
+            console.log(`child process exited with code ${code}`);
+            if (callback) callback(new Date() - startTime);
+        });
+    }
+
+    byteToStr(astr) {
+        try {
+            astr = astr.toString('utf-8');
+            return astr;
+        } catch (e) {
+            astr = String(astr);
+            const isByte = /^b\'{0,1}/;
+            if (isByte.test(astr)) {
+                astr = astr.replace(/^b\'{0,1}/, '').replace(/\'{0,1}$/, '');
+            }
+            return astr;
+        }
     }
 
     processesCount(processName) {
         const normalizedProcessName = processName.toLowerCase();
         let cmd;
-    
+
         if (this.isWindows()) {
             cmd = `tasklist /fi "imagename eq ${processName}`;
         } else {
@@ -199,7 +228,7 @@ class Zip extends Base {
         let processZipCount = this.processesCount(processName)
         return processZipCount
     }
-    
+
     async execTask() {
         if (!this.execTaskEvent) {
             this.log(`Background compaction task started`, true);
@@ -212,10 +241,11 @@ class Zip extends Base {
                     this.log(`7zProcesse tasks is full. current tasks:${this.concurrentTasks}, waiting...`);
                 } else if (this.pendingTasks.length > 0) {
 
-                    const TaskObject = this.pendingTasks.shift(); 
+                    const TaskObject = this.pendingTasks.shift();
                     const command = TaskObject.command
                     const isQueue = TaskObject.isQueue
                     const token = TaskObject.token
+                    const processCallback = TaskObject.processCallback
 
                     let zipPath = TaskObject.zipPath
                     let zipName = path.basename(zipPath)
@@ -231,7 +261,7 @@ class Zip extends Base {
                             if (!isQueue) {
                                 this.execTaskCallback(token)
                             }
-                        })
+                        },processCallback)
                     } else {
                         this.pendingTasks.push(TaskObject);
                         this.log(`The file is in use, try again later, "${zipPath}"`)
@@ -274,13 +304,13 @@ class Zip extends Base {
         this.putTask(src, out, token, true, callback)
     }
 
-    putUnZipTask(src, out, callback) {
+    putUnZipTask(src, out, callback,processCallback) {
         let token = this.get_id(src)
-        this.putTask(src, out, token, false, callback, false)
+        this.putTask(src, out, token, false, callback, false,processCallback)
     }
-    putUnZipQueueTask(src, out, callback) {
+    putUnZipQueueTask(src, out, callback,processCallback) {
         let token = this.get_id(src)
-        this.putTask(src, out, token, false, callback)
+        this.putTask(src, out, token, false, callback,true,processCallback)
     }
 
     putQueueCallback(callback, token) {
@@ -304,10 +334,10 @@ class Zip extends Base {
                     resolve();
                 }
             });
-        }).catch((error) => {});
+        }).catch((error) => { });
     }
 
-    putTask(src, out, token, isZip = true, callback, isQueue = true) {
+    putTask(src, out, token, isZip = true, callback, isQueue = true,processCallback) {
         if (callback && !this.callbacks[token]) {
             this.callbacks[token] = {
                 callback,
@@ -358,7 +388,8 @@ class Zip extends Base {
                 command,
                 zipPath,
                 token,
-                isQueue
+                isQueue,
+                processCallback
             })
         }
         this.execTask()

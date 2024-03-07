@@ -4,8 +4,9 @@ const os = require('os')
 const path = require('path');
 const regedit = require('regedit').promisified;
 const { execSync, exec } = require('child_process');
-let config={};
-const {file,tool,strtool} = require('../utils');
+let config = {};
+const { file, tool, strtool, plattool } = require('../utils');
+const { gdir } = require('../globalvars');
 
 class Win {
     pathKey = 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment'
@@ -18,7 +19,7 @@ class Win {
         return os.platform() === 'win32';
     }
 
-    kill(process="chrome") {
+    kill(process = "chrome") {
         const cmd = `pkill ${process}`;
         return cmd;
     }
@@ -37,10 +38,6 @@ class Win {
         } else {
             if (callback) callback()
         }
-    }
-
-    runAsAdmin(exe) {
-        this.exec_asadmin(exe)
     }
     async getPathEnv() {
         let listResult = await this.queryRegistry(this.pathKey)
@@ -192,7 +189,25 @@ class Win {
             if (callback) callback(err, std)
         });
     }
-    exec_asadmin(file_path, group, default_config, pare = '', callback) {
+    async runAsAdmin(file_path, callback) {
+        file_path = path.normalize(file_path);
+        let cmd;
+        let result;
+        if (!fs.existsSync(file_path)) {
+            const baseDir = path.dirname(file_path);
+            cmd = `explorer "${baseDir}"`;
+            result = { error: 'Executable file does not exist. Opening the parent directory of the executable file.' };
+            console.error(result.error);
+        } else {
+            cmd = `explorer "${file_path}"`;
+            result = await plattool.execCommand(cmd, true);
+        }
+        if (callback) {
+            callback(result);
+        }
+    }
+    runAsAdminByGSudo(file_path, group, default_config, pare = '', callback) {
+        console.log(`file_path`, file_path)
         file_path = path.normalize(file_path)
         let cmd
         let runmode = `explorer`
@@ -201,7 +216,7 @@ class Win {
             cmd = `explorer "${file_path}"`
         } else {
             if (file.isExecutable(file_path)) {
-                let gsudo = file.get_bin(`gsudo.exe`)
+                let gsudo = gdir.getLibraryByWin32Dir(`gsudo.portable/gsudo.exe`)
                 gsudo = path.normalize(gsudo)
                 let current_user = os.userInfo().username;
                 if (pare) {
@@ -213,18 +228,18 @@ class Win {
                 cmd = `explorer "${file_path}"${pare}`
             }
         }
-        console.log(cmd)
-        tool.exeBySpawn(cmd, (err, std) => {
+
+        console.log(`cmd`, cmd)
+        plattool.execCommand(cmd, true, null, null, (err, std) => {
             let rData = {
                 runmode,
                 err,
                 std
             }
             if (callback) callback(rData)
-        });
+        }, 3000);
     }
 
-    
     isHyperVEnabled(callback) {
         tool.exec_cmd('dism /online /get-featureinfo /featurename:Microsoft-Hyper-V', (stdout, error, stderr) => {
             const isEnabled = stdout.includes('State : Enabled');
@@ -262,7 +277,7 @@ class Win {
         });
     }
 
-    
+
 
     checkVersionByTail(inputText, version) {
         const lines = inputText.split(/[\n\r]+/);
@@ -334,7 +349,7 @@ class Win {
         if (callback) callback(vs)
     }
 
-    async  killProcessByPort(port) {
+    async killProcessByPort(port) {
         return new Promise((resolve, reject) => {
             const netstatCommand = `netstat -ano | findstr :${port}`;
             exec(netstatCommand, (error, stdout, stderr) => {
@@ -348,12 +363,12 @@ class Win {
                     const match = line.match(pidRegex);
                     return match ? match[1] : null;
                 }).filter(pid => pid); // Filter out null values
-    
+
                 if (pids.length === 0) {
                     resolve(`No processes found using port ${port}`);
                     return;
                 }
-    
+
                 const forceOption = pids.length > 1 ? '/F' : '';
                 const taskkillCommand = `taskkill ${forceOption} /PID ${pids.join(' /PID ')}`;
                 exec(taskkillCommand, (error, stdout, stderr) => {

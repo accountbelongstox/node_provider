@@ -624,7 +624,7 @@ class File extends Base {
             const fileSizeInBytes = stats.size;
             return fileSizeInBytes;
         } catch (error) {
-            return -1; // 返回-1表示获取文件大小失败
+            return -1; 
         }
     }
 
@@ -649,11 +649,19 @@ class File extends Base {
         }
         try {
             const stats = fs.statSync(fp);
-            return stats.mtime.getTime(); // 返回修改时间
+            return stats.mtime.getTime(); 
         } catch (error) {
             console.error(`Error getting modification time: ${error.message}`);
             return 0;
         }
+    }
+
+    isModifiedYesterday(fp) {
+        const modificationTime = this.getModificationTime(fp);
+        const now = new Date();
+        const yesterday = new Date(now);
+        yesterday.setDate(now.getDate() - 1);
+        return modificationTime < yesterday.getTime();
     }
 
     saveFile(file_path, text) {
