@@ -420,8 +420,8 @@ class File extends Base {
         return `data:${mimeType};base64,${base64Image}`;
     }
 
-    symlinkSync(src, target) {
-        this.symlink(src, target)
+    symlinkSync(src, target,force = false) {
+        this.symlink(src, target,force)
     }
 
     slicePathLevels(filePath, levels) {
@@ -1057,6 +1057,16 @@ class File extends Base {
         const ext = path.extname(filePath).toLowerCase();
         const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff', '.ico'];
         return imageExtensions.includes(ext);
+    }
+
+    //isZip 
+    isCompressedFile(filePath) {
+        if (!this.isFile(filePath)) {
+            return false;
+        }
+        const ext = path.extname(filePath).toLowerCase();
+        const compressedExtensions = ['.zip', '.rar', '.7z', '.tar', '.gz', '.bz2', '.xz', '.tar.gz', '.tar.bz2', '.tar.xz', '.tgz', '.tbz2', '.txz'];
+        return compressedExtensions.includes(ext);
     }
 
     get_html_raw_dir(filename = '',) {

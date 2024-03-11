@@ -1,366 +1,159 @@
-const { exec, execSync } = require('child_process');
 const path = require('path');
-const { config_base, config } = require('../comlib/config.js');
-const fileUnit = require('../unit/fileUnit.js');
-const stringUnit = require('../unit/stringUnit.js');
-const htmlWidget = require('../widget/htmlWidget.js');
-const httpWidget = require('../widget/httpWidget.js');
-const winapiWidget = require('../widget/winapiWidget.js');
-const shortcutIconWidget = require('../widget/shortcutIconWidget.js');
-const zipWidget = require('../widget/zipWidget.js');
-const messageWidget = require('../widget/messageWidget.js');
-const utilUnit = require('../unit/utilUnit.js');
+const { plattool, strtool } = require('../utils.js');
+const Base = require('../base/base');
 
-class Winget {
-    install_queue = []
-    must_softs = []
+class Winget extends Base {
+    taskQueue = {}
+    isQueueRunning = false;
 
-    search(query) {
-        return new Promise((resolve, reject) => {
-            exec(`winget search ${query}`, (error, stdout, stderr) => {
-                if (error) {
-                    reject(error);
-                } else {
-                    resolve(stdout);
-                }
-            });
-        }).catch(() => { })
+    constructor() {
+        super();
     }
 
-    async install(softConfig, callback) {
-        let target = softConfig.target;
-        let basename = softConfig.basename;
-        let grouname = softConfig.grouname;
-        let aid = softConfig.aid;
-        let imgid = softConfig.imgid;
-        let sPath = softConfig.path ? softConfig.path : target;
-        let soft_folder = fileUnit.getLevelPath(sPath, 2)
-        let source_local = softConfig.source_local;
-        let winget_id = softConfig.winget_id;
-        if (!aid) {
-            aid = shortcutIconWidget.genAid(basename)
-            softConfig.aid = aid
-        }
-        if (!imgid) {
-            imgid = shortcutIconWidget.genImagId(grouname, basename)
-            softConfig.aid = aid
-        }
-        // return
-        if (winget_id) {
-            await this.installById(softConfig, true, callback);
-        } else if (source_local) {
-            await this.installByInstallPack(softConfig, grouname, callback);
-        } else {
-            await this.installByUnzipRemote(softConfig, grouname, callback);
-        }
-    }
-
-    installById(installConfig, silent = true, callback) {
-        let { basename, winget_id, aid, imgid, grouname } = installConfig
-        htmlWidget.startInstallProgress(0, 1, aid)
-        this.isInstalled(winget_id, aid).then((isInstalled) => {
-            if (!isInstalled) {
-                htmlWidget.startInstallProgress(20, 30, aid)
-                let soft_localpath = stringUnit.to_windowspath(path.join(config.soft_localpath, basename))
-                let cmd = `winget install --id "${winget_id}"`
-                if (silent) {
-                    cmd += ` --accept-package-agreements --location "${soft_localpath}" --silent`
-                }
-                fileUnit.mkdir(soft_localpath)
-                this.install_queue.push({
-                    id: winget_id,
-                    winget_id,
-                    command: cmd,
-                    aid,
-                    imgid,
-                    callback
-                })
-                this.exec_install()
-            } else {
-                htmlWidget.startInstallProgress(10, 100, aid, 100, true, 50)
-            }
-        }).catch(e => { })
-    }
-
-    installByInstallPack(installConfig, group_name, callback) {
-        let remote_update_url = config.setting_soft_remote_update_url
-        if (remote_update_url.startsWith('\\\\')) {
-            this.installByConfigProgress(installConfig, group_name, callback, `NetwordShare`)
-        } else if (remote_update_url.startsWith('http://') || remote_update_url.startsWith('https://')) {
-            this.installByConfigProgress(installConfig, group_name, callback, `HttpDownload`)
-        } else if (remote_update_url.startsWith('ftp://')) {
-            if (callback) callback(false)
-        } else {
-            if (callback) callback(false)
-        }
-    }
-
-    installByUnzipRemote(installConfig, group_name, callback) {
-        console.log(`installByUnzipRemote`)
-        console.log(installConfig)
-        return 
-        let remote_update_url = config.setting_soft_remote_update_url
-        if (remote_update_url.startsWith('\\\\')) {
-            this.installByConfigProgress(installConfig, group_name, callback, `NetwordShare`)
-        } else if (remote_update_url.startsWith('http://') || remote_update_url.startsWith('https://')) {
-            this.installByConfigProgress(installConfig, group_name, callback, `HttpDownload`)
-        } else if (remote_update_url.startsWith('ftp://')) {
-            if (callback) callback(false)
-        } else {
-            if (callback) callback(false)
-        }
-    }
-
-    async installByConfigProgress(installConfig, group_name, callback, remoteType = 'NetwordShare') {
-        let install_key = `install.installedSoftFolders`
-        let { target, basename, soruce_url, default_dir, iconPath, iconBase64 } = installConfig
-        let remote_url = config.setting_soft_remote_update_url
-        let install_path = config.soft_localpath
-        let Drive = fileUnit.getDrive(install_path)
-        let aid = `a` + stringUnit.get_id(basename)
-        if (!fileUnit.isFile(target)) {
-
-            let soft_basefolder = fileUnit.getLevelPath(target, 0, 2)
-            if (winapiWidget.hasListUserData(install_key, soft_basefolder)) {
-                shortcutIconWidget.updateIconToHTML(group_name, basename, target)
-                if (callback) return callback(true)
-                return
-            }
-            fileUnit.mkdir(install_path)
-            let base_path = fileUnit.slicePathLevels(target, 2)
-            let soft_basename = path.basename(base_path)
-            let zip_name = `${soft_basename}.zip`
-            htmlWidget.startInstallProgress(0, 50, aid)
-
-            let target_zipname = path.join(Drive + ':/.temp/applications', zip_name)
-
-            let zip_network_path
-            if (remoteType == 'NetwordShare') {
-                zip_network_path = fileUnit.getNetworkPath(remote_url, `applications/${zip_name}`)
-                this.installProgressInfo(basename, target, zip_network_path, target_zipname, base_path)
-                fileUnit.putCopyTask(zip_network_path, target_zipname, null,
-                    (destination, success, timeDifference) => {
-                        this.unzipAndinstall(aid, destination, install_path, success, group_name, basename, target, target_zipname, install_key, soft_basefolder, callback)
-                    })
-
-            } else if (remoteType == 'HttpDownload') {
-                zip_network_path = httpWidget.joinURL(remote_url, `applications/${zip_name}`)
-                this.installProgressInfo(basename, target, zip_network_path, target_zipname, base_path)
-                httpWidget.get_file(zip_network_path, target_zipname).then((result) => {
-                    let destination = result.dest
-                    let success = result.success
-                    this.unzipAndinstall(aid, destination, install_path, success, group_name, basename, target, target_zipname, install_key, soft_basefolder, callback)
-                })
-            }
-
-        } else {
-            shortcutIconWidget.updateIconToHTML(group_name, basename, target)
-            console.log(`basename ${basename} is already installed`)
-            if (callback) callback(true)
-        }
-    }
-
-    installProgressInfo(basename, target, zip_network_path, target_zipname, base_path) {
-        console.log(`Installing ${basename} Infoa:`)
-        console.log(`\ttarget: ${target}`)
-        console.log(`\tzip_network_path: ${zip_network_path}`)
-        console.log(`\ttarget_zipname: ${target_zipname}`)
-        console.log(`\tbase_path: ${base_path}`)
-    }
-
-    unzipAndinstall(aid, destination, install_path, success, group_name, basename, target, target_zipname, install_key, soft_basefolder, callback) {
-        htmlWidget.startInstallProgress(50, 95, aid)
-        console.log(`install copyed:`)
-        console.log(`\tdestination: ${destination}`)
-        console.log(`\tsuccess: ${success}`)
-        console.log(`\tinstall_path: ${install_path}`)
-        if (destination && success) {
-            try {
-                zipWidget.putUnZipTask(destination, install_path, () => {
-                    htmlWidget.startInstallProgress(95, 99, aid)
-                    console.log(`Start to update the icon to the interface by :`)
-                    console.log(`\ttarget: ${target}`)
-                    shortcutIconWidget.updateIconToHTML(group_name, basename, target)
-                    fileUnit.delete(target_zipname)
-                    htmlWidget.startInstallProgress(99, 100, aid)
-                    winapiWidget.addListUserData(install_key, soft_basefolder)
-                    if (callback) callback(true)
-                })
-            } catch (e) {
-                console.log(e)
-                if (callback) callback(false)
-            }
-        } else {
-            htmlWidget.startInstallProgress(0, 0, aid)
-            if (callback) callback(false)
-        }
-    }
-
-    exec_install() {
-        if (this.install_queue.length == 0) {
+    addQueue(software) {
+        if (!software || typeof software !== 'object') {
+            console.error('Invalid software object.');
             return;
         }
-        let { id, command, aid, callback, winget_id } = this.install_queue.shift();
-        let startTime = new Date();
-
-        let stdoutData = '';
-        let isSuccess = false;
-
-        utilUnit.exeBySpawn(command, (msg) => {
-            console.log(msg)
-            httpWidget.sendToWebSocket('public:addCommand', msg)
-            htmlWidget.addInstallProgress(1, 98, aid)
-        }, (done, success, stdoutData) => {
-            if (stdoutData.includes("Successfully installed")) {
-                isSuccess = true;
-            }
-            let installstatus = ``
-            const timeDifference = new Date() - startTime; // 计算时间间隔
-            if (isSuccess) {
-                installstatus = `successfully`
-                htmlWidget.startInstallProgress(98, 101, aid);
-            } else {
-                installstatus = `failed`
-                htmlWidget.startInstallProgress(0, 0, aid, 100, false);
-            }
-            let msg = `${winget_id} installed ${installstatus}, time taken ${timeDifference / 1000}m`
-            if (isSuccess) {
-                messageWidget.success(msg)
-            } else {
-                messageWidget.error(msg)
-            }
-            httpWidget.sendToWebSocket('public:addCommand', stdoutData)
-            if (callback) callback(isSuccess);
-            this.exec_install();
-        })
-
-
-        childProcess.stdout.on('data', (data) => {
-            // htmlWidget.addInstallProgress(aid);
-            stdoutData += data.toString();
-            console.log(`on_data`);
-            console.log(data.toString());
-        });
-
-        childProcess.stderr.on('data', (data) => {
-            // htmlWidget.addInstallProgress(aid);
-            console.log(`data`);
-            console.log(`StdError: ${data.toString()}`);
-        });
-
-        childProcess.on('exit', (code) => {
-            if (code !== 0) {
-                console.log(`success`);
-                console.log(`Error: Process exited with code ${code}`);
-            } else {
-                if (stdoutData.includes("Successfully installed")) {
-                    isSuccess = true;
-                }
-                console.log(`success`);
-                const timeDifference = new Date() - startTime; // 计算时间间隔
-                console.log(`${id} installed success. ${timeDifference}s`);
-                htmlWidget.startInstallProgress(98, 101, aid);
-                if (callback) callback(isSuccess);
-                this.exec_install();
-            }
-        });
+        if (!software.hasOwnProperty('aid')) {
+            console.error('Software object must have a aid property.');
+            return;
+        }
+        const { aid } = software;
+        if (aid in this.taskQueue) {
+            console.warn(`${aid} is already in the installation queue.`);
+            return;
+        }
+        this.taskQueue[aid] = software;
+        if (!this.isQueueRunning) {
+            this.popQueue();
+        }
     }
 
-    uninstall(packageId) {
-        return new Promise((resolve, reject) => {
-            exec(`winget uninstall ${packageId}`, (error, stdout, stderr) => {
-                if (error) {
-                    reject(error);
-                } else {
-                    resolve(stdout);
-                }
-            });
-        }).catch(() => { })
-    }
-
-    isInstalled(packageId, aid) {
-        return new Promise((resolve, reject) => {
-            utilUnit.exeBySpawn(`winget list`, (msg) => {
-                htmlWidget.addInstallProgress(1, 20, aid)
-            }, (done, success, stdout) => {
-                if (done) {
-                    let isExists = false
-                    if (stdout.includes(packageId)) {
-                        isExists = true
-                    }
-                    if (!success) {
-                        reject(false)
-                    }
-                    resolve(isExists);
-                }
+    popQueue() {
+        const queueLength = Object.keys(this.taskQueue).length;
+        if (queueLength > 0) {
+            const keys = Object.keys(this.taskQueue);
+            const firstKey = keys[0];
+            const software = this.taskQueue[firstKey];
+            delete this.taskQueue[firstKey];
+            const basename = software.basename;
+            this.installSoftware(software, true, () => {
+                this.popQueue()
             })
-        }).catch(() => { })
-    }
-
-    queryInstalled(packageIds) {
-        return new Promise((resolve, reject) => {
-            utilUnit.exeBySpawn(`winget list`, (done, success, stdout) => {
-                if (done) {
-                    let unInstalled = []
-                    packageIds.forEach((packageId) => {
-                        if (!stdout.includes(packageId)) {
-                            unInstalled.push(packageId)
-                        }
-                    })
-                    if (error) {
-                        reject(unInstalled)
-                    }
-                    resolve(unInstalled);
-                }
-            });
-        }).catch(() => { })
-    }
-
-    setInstallPath(path) {
-        // Winget CLI 不直接支持设置安装路径，但你可以尝试使用其他工具或手动设置它。
-        // 这个方法仅作为一个示例。
-        console.log(`Setting install path is not directly supported by winget CLI.`);
-    }
-
-    query_exe(targetFolderPath) {
-        const installExePath = path.join(targetFolderPath, 'install.exe');
-        // 如果 install.exe 存在，则返回该文件路径
-        if (fs.existsSync(installExePath)) {
-            return installExePath;
-        }
-        const misFiles = fs.readdirSync(targetFolderPath).filter(file => path.extname(file) === '.msi');
-        if (misFiles.length > 0) {
-            return misFiles[0]
-        }
-        // 否则查找包含 install 的 exe 文件
-        const exeFiles = fs.readdirSync(targetFolderPath).filter(file => path.extname(file) === '.exe');
-        if (exeFiles.length === 1) {
-            // 如果目录下只有一个 exe 文件，则直接返回该文件路径
-            return path.join(targetFolderPath, exeFiles[0]);
-        } else if (exeFiles.length > 1) {
-            // 如果目录下有多个 exe 文件，则返回体积最大的
-            let maxSize = -1;
-            let maxFile = '';
-            for (const file of exeFiles) {
-                const filePath = path.join(targetFolderPath, file);
-                const stat = fs.statSync(filePath);
-
-                if (stat.isFile() && stat.size > maxSize) {
-                    maxSize = stat.size;
-                    maxFile = filePath;
-                }
-            }
-            return maxFile;
         } else {
-            // 如果都没有找到，则返回该目录下的唯一一个文件
-            const files = fs.readdirSync(targetFolderPath);
-
-            if (files.length === 1) {
-                return path.join(targetFolderPath, files[0]);
-            } else {
-                return null
-            }
+            this.isQueueRunning = false
         }
+    }
+
+    installSoftware(software, silent = true, callback) {
+        const appDir = software.appDir;
+        const basename = software.basename;
+        const winget_id = software.winget_id;
+        const progressCallback = software.progressCallback;
+        let installDir = path.join(appDir, basename);
+        let command = `winget install --id "${winget_id}"`;
+        if (silent) {
+            command += ` --accept-package-agreements --location "${installDir}" --silent`;
+        }
+
+        plattool.execCommand(command)
+            .then((result) => {
+                console.log(`Software ${winget_id} installed successfully.`);
+                if (progressCallback) {
+                    progressCallback(100, result);
+                }
+                if (callback) callback()
+            })
+            .catch((err) => {
+                console.error(`Failed to install software ${winget_id}: ${err}`);
+                if (progressCallback) {
+                    progressCallback(-1, err);
+                }
+                if (callback) callback()
+            });
+    }
+
+    async isInstalled(software, callback) {
+        let winget_id;
+        if (typeof software !== 'string') {
+            winget_id = software.winget_id;
+        } else {
+            winget_id = software;
+        }
+
+        try {
+            const stdout = await plattool.execCommand('winget list');
+            const isExists = stdout.includes(winget_id);
+            if (callback) {
+                callback(null, isExists);
+            }
+            return isExists;
+        } catch (err) {
+            console.error(`Error checking if software ${winget_id} is installed: ${err}`);
+            if (callback) {
+                callback(err);
+            }
+            return false;
+        }
+    }
+
+    parseInstalledSoftwareList(output) {
+        const lines = output.split('\n').filter(line => line.trim() !== '');
+        const installedSoftware = lines.map(line => {
+            const parts = line.split('\t');
+            return {
+                name: parts[0].trim(),
+                id: parts[1].trim()
+            };
+        });
+        return installedSoftware;
+    }
+    
+    async getInstalledList(callback) {
+        try {
+            const stdout = await plattool.execCommand('winget list');
+            const installedSoftware = this.parseInstalledSoftwareList(stdout);
+            if (callback) {
+                callback(null, installedSoftware);
+            }
+            return installedSoftware;
+        } catch (err) {
+            console.error(`Error getting installed software list: ${err}`);
+            if (callback) {
+                callback(err);
+            }
+            return [];
+        }
+    }
+
+    async searchSoftware(query, callback) {
+        try {
+            const stdout = await plattool.execCommand(`winget search "${query}"`);
+            const softwareList = this.parseSearchResults(stdout);
+            if (callback) {
+                callback(null, softwareList);
+            }
+            return softwareList;
+        } catch (err) {
+            console.error(`Error searching for software with query "${query}": ${err}`);
+            if (callback) {
+                callback(err);
+            }
+            return [];
+        }
+    }
+
+    parseSearchResults(output) {
+        const lines = output.split('\n').filter(line => line.trim() !== '');
+        const softwareList = lines.map(line => {
+            const parts = line.split('\t');
+            return {
+                name: parts[0].trim(),
+                id: parts[1].trim()
+            };
+        });
+        return softwareList;
     }
 
     createInstallIconChart(aid, src, percent, w, h,) {
@@ -371,7 +164,7 @@ class Winget {
         let r = 100
         let cx = 100
         let cy = 100
-        let imgId = stringUnit.create_id(src)
+        let imgId = strtool.create_id(src)
         let html = `
         <div id="install_${imgId}">
             <figure id="selft-pie2" style="position:relative;width:${w}px;height:${h}px;"><svg xmlns:svg="http://www.w3.org/2000/svg"

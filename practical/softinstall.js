@@ -6,7 +6,7 @@ const fetch = require('node-fetch');
 const child_process = require('child_process');
 const { gdir } = require('../globalvars.js');
 const Base = require('../base/base');
-const { httptool, zip, file } = require('../utils.js');
+const { httptool, zip, file, plattool } = require('../utils.js');
 
 class Softinstall extends Base {
     installQueue = {}
@@ -90,51 +90,6 @@ class Softinstall extends Base {
         }
     }
 
-    async getSoftwareGroup() {
-        const apiUrl = `${this.app.config.api_url}/config/soft_group.json`;
-        try {
-            const response = await fetch(apiUrl);
-            if (response.status === 200) {
-                const softwareGroup = await response.json();
-                return softwareGroup;
-            } else {
-                throw new Error('Failed to retrieve software group data.');
-            }
-        } catch (error) {
-            throw error;
-        }
-    }
-
-    async getSoftwareIcons() {
-        const apiUrl = `${this.app.config.api_url}/config/soft_icons.json`;
-        try {
-            const response = await fetch(apiUrl);
-            if (response.status === 200) {
-                const softwareIcons = await response.json();
-                return softwareIcons;
-            } else {
-                throw new Error('Failed to retrieve software icon data.');
-            }
-        } catch (error) {
-            throw error;
-        }
-    }
-
-    async getSoftwareList() {
-        const apiUrl = `${this.app.config.api_url}/config/soft_all.json`;
-        try {
-            const response = await fetch(apiUrl);
-            if (response.status === 200) {
-                const softwareList = await response.json();
-                return softwareList;
-            } else {
-                throw new Error('Failed to retrieve software list data.');
-            }
-        } catch (error) {
-            throw error;
-        }
-    }
-
     compareJSON(objA, objB) {
         if (typeof objA !== 'object' || typeof objB !== 'object') {
             return false;
@@ -154,87 +109,6 @@ class Softinstall extends Base {
             }
         }
         return true;
-    }
-
-    mergeJSON(objA, objB) {
-        if (this.compareJSON(objA, objB)) {
-            return objA;
-        }
-        return Object.assign({}, objA, objB);
-    }
-
-    readLocalSoftwareGroups() {
-        const dataDir = path.join(this.app.config.appUserDataDir, 'data');
-        const softwareGroupsFilePath = path.join(dataDir, 'software_groups.json');
-        try {
-            if (fs.existsSync(softwareGroupsFilePath)) {
-                const softwareGroupsData = fs.readFileSync(softwareGroupsFilePath, 'utf8');
-                return JSON.parse(softwareGroupsData);
-            }
-        } catch (error) {
-            console.error('读取本地软件分组时出错:', error);
-        }
-        return {};
-    }
-
-    async readAndUpdateLocalSoftwareIcons() {
-        const dataDir = path.join(this.app.config.appUserDataDir, 'data');
-        const softwareIconsFilePath = path.join(dataDir, 'software_icons.json');
-        let localSoftwareIcons = {};
-        try {
-            if (fs.existsSync(softwareIconsFilePath)) {
-                const softwareIconsData = fs.readFileSync(softwareIconsFilePath, 'utf8');
-                localSoftwareIcons = JSON.parse(softwareIconsData);
-            }
-        } catch (error) {
-            console.error('读取本地软件图标时出错:', error);
-        }
-        try {
-            const response = await axios.get('REMOTE_ICON_JSON_URL');
-            if (response.status === 200) {
-                localSoftwareIcons = { ...localSoftwareIcons, ...response.data };
-                fs.writeFile(softwareIconsFilePath, JSON.stringify(localSoftwareIcons), (writeError) => {
-                    if (writeError) {
-                        console.error('写入本地软件图标时出错:', writeError);
-                    }
-                });
-            }
-        } catch (requestError) {
-            console.error('请求远程软件图标时出错:', requestError);
-        }
-        return localSoftwareIcons;
-    }
-
-    async updateLocalSoftwareGroups() {
-        const dataDir = path.join(this.app.config.appUserDataDir, 'data');
-        const softwareGroupsFilePath = path.join(dataDir, 'software_groups.json');
-        let localSoftwareGroups = {};
-        try {
-            if (fs.existsSync(softwareGroupsFilePath)) {
-                const softwareGroupsData = fs.readFileSync(softwareGroupsFilePath, 'utf8');
-                localSoftwareGroups = JSON.parse(softwareGroupsData);
-            }
-        } catch (error) {
-            console.error('读取本地软件分组时出错:', error);
-        }
-        try {
-            const response = await axios.get(remoteSoftwareGroupsURL);
-            if (response.status === 200) {
-                const remoteSoftwareGroups = response.data;
-                Object.keys(remoteSoftwareGroups).forEach((groupName) => {
-                    localSoftwareGroups[groupName] = localSoftwareGroups[groupName] || {};
-                    const remoteGroup = remoteSoftwareGroups[groupName];
-                    localSoftwareGroups[groupName] = { ...localSoftwareGroups[groupName], ...remoteGroup };
-                });
-                fs.writeFile(softwareGroupsFilePath, JSON.stringify(localSoftwareGroups), (writeError) => {
-                    if (writeError) {
-                        console.error('写入本地软件分组时出错:', writeError);
-                    }
-                });
-            }
-        } catch (requestError) {
-            console.error('请求远程软件分组时出错:', requestError);
-        }
     }
 
     parseSoftwareGroups(mergedSoftwareGroups) {
@@ -257,34 +131,100 @@ class Softinstall extends Base {
         }
         return parsedSoftwareGroups;
     }
-    async executeSoftware(software) {
-        if (!software.path || !software.target || !software.installation_method) {
-            throw new Error('执行软件所需的参数不完整');
+
+    async installationRulesBefore(software, progressCallback, callback) {
+        const appDir = software.appDir;
+        const target = software.target;
+        const mainDir = file.getLevelPath(target, 2);
+        const mainDirLow = mainDir.toLowerCase();
+
+        // if (mainDir.startsWith('Adobe')) {
+        //     const message = `The installation path is not allowed to be in the C:\\Program Files directory.`
+        //     console.log(message)
+        //     if (progressCallback) progressCallback(-1, message)
+        //     if (callback) callback()
+        //     return
+        // }
+                  
+        if (mainDirLow.startsWith('avast')) {
+            const links = [
+                [gdir.getUserProfileDir('AppData/Local/AVAST Software'), 'AVAST Software'],
+                ['C:/Program Files (x86)/AVAST Software', 'AVAST Software'],
+            ]
+            this.linkToDirs(links, appDir,false)
+        }else if (mainDirLow.startsWith('discord')) {
+            const links = [
+                [gdir.getUserProfileDir('AppData/Local/Discord'), 'Discord'],
+            ]
+            this.linkToDirs(links, appDir,false)
+        }else if (mainDirLow.startsWith('Adobe')) {
+            const links = [
+                ['C:/Program Files (x86)/Adobe', 'Adobe(x86)'],
+                ['C:/Program Files/Adobe', 'Adobe'],
+                ['C:/ProgramData/Adobe', 'Adobe_ProgramData'],
+            ]
+            this.linkToDirs(links, appDir,false)
         }
-        if (fs.existsSync(software.target)) {
-            child_process.exec(`explorer "${software.target}"`);
-        } else {
-            if (software.installation_method === 'winget') {
-                if (!software.winget_id) {
-                    throw new Error('winget安装所需的参数不完整');
+        else if (mainDirLow.startsWith('bravesoftware')) {
+            const links = [
+                ['C:/Program Files/BraveSoftware', 'BraveSoftware'],
+            ]
+            this.linkToDirs(links, appDir,false)
+        }
+        else if (mainDirLow.startsWith('avg')) {
+            const links = [
+                [gdir.getUserProfileDir('AppData/Local/AVG'), 'AVG'],
+            ]
+            this.linkToDirs(links, appDir,false)
+        }
+        else if (mainDirLow.startsWith('google')) {
+            const links = [
+                [gdir.getUserProfileDir('AppData/Local/Google'), 'Google'],
+                ['C:/Program Files/Google', 'Google'],
+                ['C:/Program Files (x86)/Google', 'Google/x86'],
+            ]
+            this.linkToDirs(links, appDir,false)
+        }
+        else if (mainDirLow.startsWith('microsoft visual studio')) {
+            const links = [
+                ['C:/CocosDashboard', 'CocosDashboard'],
+                ['C:/Program Files (x86)/Microsoft Visual Studio', 'MicrosoftVisualStudio_x86Dir'],
+                ['C:/Program Files/Microsoft Visual Studio', 'MicrosoftVisualStudio'],
+                ['C:/Program Files (x86)/Unity Hub', 'UnityHub_x86Dir'],
+                ['C:/Program Files/Unity Hub', 'UnityHub'],
+                ['C:/Program Files (x86)/Epic Games', 'EpicGames_x86Dir'],
+                ['C:/Program Files/Epic Games', 'EpicGames'],
+                ['C:/Program Files (x86)/Xamarin', 'Xamarin_x86Dir'],
+                ['C:/Program Files/Xamarin', 'Xamarin'],
+                ['C:/Program Files (x86)/Microsoft SDKs', 'MicrosoftSDKs_x86Dir'],
+                ['C:/Program Files/Microsoft SDKs', 'MicrosoftSDKs'],
+                ['C:/Program Files (x86)/Microsoft SQL Server', 'MicrosoftSQLServer_x86Dir'],
+                ['C:/Program Files/Microsoft SQL Server', 'MicrosoftSQLServer'],
+                ['C:/Program Files (x86)/dotnet', 'dotnet_x86Dir'],
+                ['C:/Program Files/dotnet', 'dotnet'],
+                ['C:/Program Files (x86)/Android', 'Android_x86Dir'],
+                ['C:/Program Files/Android', 'Android'],
+                ['C:/ProgramData/Microsoft/VisualStudio', 'VisualStudio_ProgramData'],
+                ['C:/ProgramData/Epic', 'Epic_ProgramData'],
+                ['C:/ProgramData/Microsoft Visual Studio', 'MicrosoftVisualStudio_ProgramData']
+            ]
+            this.linkToDirs(links, appDir)
+        }
+    }
+
+    linkToDirs(links, appDir,force=true) {
+        try {
+            links.forEach(link => {
+                const [targetPath, src] = link;
+                let sourcePath = src
+                if (!file.isAbsolute(src)) {
+                    sourcePath = path.join(appDir, src);
                 }
-                const installDir = software.default_install_dir || this.app.config.default_install_dir;
-                const installCommand = `winget install --id ${software.winget_id} --location "${installDir}"`;
-                child_process.exec(installCommand);
-            } else if (software.installation_method === 'unzip') {
-                if (!software.basename || !software.source_internet) {
-                    throw new Error('解压安装所需的参数不完整');
-                }
-                const installDir = software.default_install_dir || this.app.config.default_install_dir;
-                const installPath = path.join(installDir, software.basename);
-                if (!fs.existsSync(installPath)) {
-                    const fileUrl = `${this.app.config.API}/${software.source_internet}`;
-                    const localFilePath = await this.downloadFile(fileUrl);
-                    this.unzipFile(localFilePath, installDir);
-                }
-            } else {
-                throw new Error('不支持的安装方法');
-            }
+                file.symlinkSync(sourcePath, targetPath,force);
+                console.log(`Symbolic link created from ${sourcePath} to ${targetPath}`);
+            });
+        } catch (error) {
+            console.error('Error creating symbolic link:', error);
         }
     }
 
@@ -295,9 +235,10 @@ class Softinstall extends Base {
         const mainDir = file.getLevelPath(target, 2);
         const source_local = software.source_local;
         const applications = 'softlist/static_src/applications/';
-
+        const software_library = 'softlist/static_src/software_library/';
         const installProgress = { value: 0 };
-
+        const download = gdir.getCustomTempDir('Downloads');
+        this.installationRulesBefore(software, progressCallback)
 
         if (software.winget_id) {
             const installCommand = `winget install --id ${software.winget_id} --location "${installDir}"`;
@@ -309,10 +250,77 @@ class Softinstall extends Base {
                 const localFilePath = await httptool.downloadFile(fileUrl, progressCallback);
                 zip.putUnZipTask(localFilePath, installDir, progressCallback);
             }
+        } else if (software.source_local || typeof software.source_local === 'string') {
+
+            let installer = false
+            const destDir = path.join(download, software.source_local);
+            if (software.source_local === 'installer') {
+                installer = true
+            }
+            let zipDir = installer ? destDir : installDir;
+            if (!fs.existsSync(target)) {
+                const downloadUrl = gdir.getLocalStaticApiUrl(`${software_library}/${software.source_local}`);
+                const localFilePath = await httptool.downloadFile(downloadUrl, destDir, (progress, readyDownload, downloading, message) => {
+                    if (progress == -1) {
+                        if (progressCallback) progressCallback(-1, message)
+                        if (callback) callback();
+                        return
+                    } else {
+                        installProgress.value = progress / 3
+                        if (progressCallback) progressCallback(installProgress.value)
+                    }
+                });
+                if (localFilePath && localFilePath.dest) {
+                    const dest = localFilePath.dest
+                    const timer = setInterval(() => {
+                        if (installProgress.value < 99) {
+                            installProgress.value++;
+                            if (progressCallback) progressCallback(installProgress.value);
+                        } else {
+                            if (timer) clearInterval(timer);
+                            if (callback) callback();
+                            return
+                        }
+                    }, 1000);
+
+                    if (file.isCompressedFile(dest)) {
+                        zip.putUnZipTask(dest, installDir, () => {
+                            if (progressCallback) progressCallback(100);
+                            if (timer) clearInterval(timer);
+                            file.delete(dest)
+                            if (callback) callback()
+                            return
+                        }, (progress) => {
+                            console.log(`progress`, progress)
+                        });
+                    } else {
+                        plattool.runAsAdmin(dest, (progress, message) => {
+                            if (progressCallback) progressCallback(100);
+                            if (timer) clearInterval(timer);
+                            if (callback) callback()
+                        })
+                    }
+                } else {
+                    const message = `Download and decompression errors.`
+                    console.log(message)
+                    if (progressCallback) progressCallback(-1, message)
+                    if (callback) callback()
+                    return
+                }
+            } else {
+                const message = `Software ${basename} is already installed in ${target}`
+                console.log(message)
+                if (progressCallback) progressCallback(100, message)
+                if (callback) callback()
+                return
+            }
+
         } else if (software.install_type === '') {
             if (!fs.existsSync(target)) {
-                const downloadUrl = gdir.getLocalStaticApiUrl(`${applications}/${mainDir}.zip`);
-                const localFilePath = await httptool.downloadFile(downloadUrl, null, (progress, readyDownload, downloading, message) => {
+                const softwareZipName = `${mainDir}.zip`
+                const downloadUrl = gdir.getLocalStaticApiUrl(`${applications}/${softwareZipName}`);
+                const destDir = path.join(download, softwareZipName);
+                const localFilePath = await httptool.downloadFile(downloadUrl, destDir, (progress, readyDownload, downloading, message) => {
                     if (progress == -1) {
                         if (progressCallback) progressCallback(-1, message)
                         if (callback) callback();
@@ -335,7 +343,6 @@ class Softinstall extends Base {
                             return
                         }
                     }, 1000);
-
                     zip.putUnZipTask(dest, installDir, () => {
                         if (progressCallback) progressCallback(100);
                         if (timer) clearInterval(timer);
@@ -348,6 +355,7 @@ class Softinstall extends Base {
                     const message = `Download and decompression errors.`
                     console.log(message)
                     if (progressCallback) progressCallback(-1, message)
+                    file.delete(dest)
                     if (callback) callback()
                     return
                 }
@@ -361,34 +369,6 @@ class Softinstall extends Base {
         } else {
             return { error: { code: 'UNSUPPORTED_INSTALL_METHOD', message: 'Unsupported installation method' } };
         }
-    }
-
-    async installWithWinget(software) {
-        if (!software.winget_id || !software.installation_method) {
-            throw new Error('winget安装所需的参数不完整');
-        }
-        const installDir = software.default_install_dir || this.app.config.default_install_dir;
-        const installCommand = `winget install --id ${software.winget_id} --location "${installDir}"`;
-        child_process.exec(installCommand);
-    }
-
-    async installByUnpacking(software) {
-        if (!software.basename || !software.installation_method) {
-            throw new Error('解压安装所需的参数不完整');
-        }
-        const installDir = software.default_install_dir || this.app.config.default_install_dir;
-        const basename = software.basename;
-        const sourceInternet = software.source_internet;
-        const downloadUrl = `${sourceInternet}/applications/${basename}.zip`;
-        const targetPath = path.join(installDir, basename);
-        if (Utils.fs.existsSync(targetPath)) {
-            console.log(`软件 ${basename} 已经安装在 ${targetPath}`);
-            return;
-        }
-        const tmpDir = this.app.config.HOME || this.app.config.userHome;
-        const tmpFilePath = path.join(tmpDir, `${basename}.zip`);
-        await this.downloadFile(downloadUrl, tmpFilePath);
-        zip.putUnZipTask(tmpFilePath, installDir);
     }
 }
 

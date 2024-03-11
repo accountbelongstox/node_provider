@@ -61,7 +61,7 @@ class Plattools extends Base {
         });
     }
 
-    
+
     async execCommand(command, info = true, cwd = null, logname = null) {
         if (info) {
             this.info(command);
@@ -95,8 +95,26 @@ class Plattools extends Base {
         });
     }
 
+    async runAsAdmin(file_path, callback) {
+        file_path = path.normalize(file_path);
+        let cmd;
+        let result;
+        if (!fs.existsSync(file_path)) {
+            const baseDir = path.dirname(file_path);
+            cmd = `explorer "${baseDir}"`;
+            result = { error: 'Executable file does not exist. Opening the parent directory of the executable file.' };
+            console.error(result.error);
+        } else {
+            cmd = `explorer "${file_path}"`;
+            result = await this.execCommand(cmd, true);
+        }
+        if (callback) {
+            callback(result);
+        }
+    }
+
     async execCmdSync(command, info = true, cwd = null, logname = null) {
-        return await this.execCommand(command, info , cwd , logname )
+        return await this.execCommand(command, info, cwd, logname)
     }
 
     wrapEmdResult(success = true, stdout = '', error = null, code = 0, info = true) {
@@ -113,7 +131,7 @@ class Plattools extends Base {
     }
 
     async cmdSync(command, info = true, cwd = null, logname = null) {
-        return await this.execCommand(command, info , cwd , logname )
+        return await this.execCommand(command, info, cwd, logname)
     }
 
     async cmdAsync(command, info = true, cwd = null, logname = null) {
@@ -194,7 +212,6 @@ class Plattools extends Base {
             };
             childProcess.stdout.on('data', (data) => {
                 resetTimer();
-                console.log(`childProcess-data`)
                 const output = this.byteToStr(data);
                 if (info) {
                     this.info(output);
@@ -206,7 +223,6 @@ class Plattools extends Base {
             });
             childProcess.stderr.on('data', (data) => {
                 resetTimer();
-                console.log(`childProcess-data`)
                 const error = this.byteToStr(data);
                 if (info) {
                     this.warn(error);
@@ -457,14 +473,6 @@ class Plattools extends Base {
             }
         }
         return false;
-    }
-
-    runAsAdmin(cmd, params = "") {
-        if (this.isWindows()) {
-            execSync(`powershell Start-Process -Verb RunAs -FilePath ${cmd} -ArgumentList ${params}`, { stdio: 'ignore' });
-        } else {
-            console.log("Administrator privileges are required.");
-        }
     }
 
     byteToStr(astr) {

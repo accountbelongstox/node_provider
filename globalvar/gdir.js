@@ -2,15 +2,36 @@ const path = require('path');
 const os = require('os');
 const fs = require('fs');
 const Base = require('../base/base');
-class Gdir extends Base{
+const http = require('http')
+class Gdir extends Base {
+    intranetIPAddress = `http://192.168.100.5/`
     localStaticApiUrl = `https://static.local.12gm.com:905/`
+    testAccessibleApi = null
     constructor() {
         super()
     }
+    getCustomTempDir(subDir) {
+        const unixStylePath = __filename.split(/\\+/).join('/');
+        const Driver = unixStylePath[0] + ":/"
+        const temp = path.join(Driver, '.tmp');
+        const fullPath = subDir ? path.join(temp, subDir) : temp;
+        if (fullPath && !fs.existsSync(fullPath)) {
+            fs.mkdirSync(fullPath, { recursive: true });
+        }
+        return fullPath;
+    }
     getRelationRootDir(subDir) {
         const cwd = path.join(__dirname, '../');
-        const fullPath = subDir ? path.join(cwd, subDir) :cwd;
+        const fullPath = subDir ? path.join(cwd, subDir) : cwd;
         if (fullPath && !fs.existsSync(fullPath)) {
+            fs.mkdirSync(fullPath, { recursive: true });
+        }
+        return fullPath;
+    }
+    getUserProfileDir(subDir) {
+        const userProfileDir = os.homedir();
+        const fullPath = subDir ? path.join(userProfileDir, subDir) : userProfileDir;
+        if (!fs.existsSync(fullPath)) {
             fs.mkdirSync(fullPath, { recursive: true });
         }
         return fullPath;
@@ -32,9 +53,35 @@ class Gdir extends Base{
         this.mkbasedir(fullPath);
         return fullPath;
     }
+    async testLocalApiUrls() {
+        try {
+            await this.testUrl(this.intranetIPAddress);
+        } catch (error) {
+            return this.localStaticApiUrl
+        }
+    }
+    async testUrl(url) {
+        return new Promise((resolve, reject) => {
+            http.get(url, (res) => {
+                const { statusCode } = res;
+                if (statusCode >= 200 && statusCode < 300) {
+                    resolve();
+                } else {
+                    reject(new Error(`Failed to access URL ${url}. Status code: ${statusCode}`));
+                }
+            }).on('error', (err) => {
+                reject(new Error(`Failed to access URL ${url}. Error: ${err.message}`));
+            });
+        });
+    }
     getLocalStaticApiUrl(upath) {
-        if(upath) return this.localStaticApiUrl + upath
+        if (upath) return this.localStaticApiUrl + upath
         return this.localStaticApiUrl
+    }
+    async getLocalStaticApiTestUrl(upath) {
+        if(!this.testAccessibleApi)this.testAccessibleApi = await this.testLocalApiUrls()
+        if (upath) return this.testAccessibleApi + upath
+        return this.testAccessibleApi
     }
     getLocalDir(subDir) {
         const homeDir = this.getHomeDir(`.the_by_node`);
@@ -43,7 +90,7 @@ class Gdir extends Base{
             fs.mkdirSync(fullPath, { recursive: true });
         }
         return fullPath;
-    } 
+    }
     getLocalFile(subDir) {
         const dir = this.getHomeDir(`.the_by_node`);
         const fullPath = subDir ? path.join(dir, subDir) : dir;
@@ -104,7 +151,7 @@ class Gdir extends Base{
             fs.mkdirSync(fullPath, { recursive: true });
         }
         return fullPath;
-    } 
+    }
     getDownloadFile(subDir) {
         const appDataDir = this.getDownloadDir();
         const fullPath = subDir ? path.join(appDataDir, subDir) : appDataDir;
@@ -112,7 +159,7 @@ class Gdir extends Base{
             fs.mkdirSync(fullPath, { recursive: true });
         }
         return fullPath;
-    }   
+    }
     getPublicDir(subDir) {
         const publicDir = this.getRootDir('public');
         const fullPath = subDir ? path.join(publicDir, subDir) : publicDir;
