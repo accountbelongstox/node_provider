@@ -9,6 +9,7 @@ class Gdir extends Base {
     testAccessibleApi = null
     constructor() {
         super()
+         
     }
     getCustomTempDir(subDir) {
         const unixStylePath = __filename.split(/\\+/).join('/');
@@ -17,7 +18,7 @@ class Gdir extends Base {
         const fullPath = subDir ? path.join(temp, subDir) : temp;
         if (fullPath && !fs.existsSync(fullPath)) {
             fs.mkdirSync(fullPath, { recursive: true });
-        }
+        } 
         return fullPath;
     }
     getRelationRootDir(subDir) {
@@ -56,6 +57,7 @@ class Gdir extends Base {
     async testLocalApiUrls() {
         try {
             await this.testUrl(this.intranetIPAddress);
+            return this.intranetIPAddress
         } catch (error) {
             return this.localStaticApiUrl
         }
