@@ -124,7 +124,7 @@ class Serve extends Base {
         if (!this.isNodeModulesNotEmpty(directory) && this.isPackageJson(directory)) {
             process.chdir(directory);
             const command = `${exe} install`
-            const result = await plattool.spawnSync(command, true, directory);
+            const result = await plattool.spawnAsync(command, true, directory);
             resultString = strtool.toString(result);
         }
         process.chdir(this.currentDir);
