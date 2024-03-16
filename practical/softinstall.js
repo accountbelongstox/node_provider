@@ -145,37 +145,36 @@ class Softinstall extends Base {
         //     if (callback) callback()
         //     return
         // }
-                  
         if (mainDirLow.startsWith('avast')) {
             const links = [
                 [gdir.getUserProfileDir('AppData/Local/AVAST Software'), 'AVAST Software'],
                 ['C:/Program Files (x86)/AVAST Software', 'AVAST Software'],
             ]
-            this.linkToDirs(links, appDir,false)
-        }else if (mainDirLow.startsWith('discord')) {
+            this.linkToDirs(links, appDir, false)
+        } else if (mainDirLow.startsWith('discord')) {
             const links = [
                 [gdir.getUserProfileDir('AppData/Local/Discord'), 'Discord'],
             ]
-            this.linkToDirs(links, appDir,false)
-        }else if (mainDirLow.startsWith('Adobe')) {
+            this.linkToDirs(links, appDir, false)
+        } else if (mainDirLow.startsWith('adobe')) {
             const links = [
                 ['C:/Program Files (x86)/Adobe', 'Adobe(x86)'],
                 ['C:/Program Files/Adobe', 'Adobe'],
                 ['C:/ProgramData/Adobe', 'Adobe_ProgramData'],
             ]
-            this.linkToDirs(links, appDir,false)
+            this.linkToDirs(links, appDir, true)
         }
         else if (mainDirLow.startsWith('bravesoftware')) {
             const links = [
                 ['C:/Program Files/BraveSoftware', 'BraveSoftware'],
             ]
-            this.linkToDirs(links, appDir,false)
+            this.linkToDirs(links, appDir, false)
         }
         else if (mainDirLow.startsWith('avg')) {
             const links = [
                 [gdir.getUserProfileDir('AppData/Local/AVG'), 'AVG'],
             ]
-            this.linkToDirs(links, appDir,false)
+            this.linkToDirs(links, appDir, false)
         }
         else if (mainDirLow.startsWith('google')) {
             const links = [
@@ -183,7 +182,7 @@ class Softinstall extends Base {
                 ['C:/Program Files/Google', 'Google'],
                 ['C:/Program Files (x86)/Google', 'Google/x86'],
             ]
-            this.linkToDirs(links, appDir,false)
+            this.linkToDirs(links, appDir, false)
         }
         else if (mainDirLow.startsWith('microsoft visual studio')) {
             const links = [
@@ -212,7 +211,7 @@ class Softinstall extends Base {
         }
     }
 
-    linkToDirs(links, appDir,force=true) {
+    linkToDirs(links, appDir, force = true) {
         try {
             links.forEach(link => {
                 const [targetPath, src] = link;
@@ -220,14 +219,72 @@ class Softinstall extends Base {
                 if (!file.isAbsolute(src)) {
                     sourcePath = path.join(appDir, src);
                 }
-                file.symlinkSync(sourcePath, targetPath,force);
-                console.log(`Symbolic link created from ${sourcePath} to ${targetPath}`);
+                if (!file.isSymbolicLink(sourcePath)) {
+                    file.symlinkSync(sourcePath, targetPath, force);
+                    console.log(`Symbolic link created from ${sourcePath} to ${targetPath}`);
+                }
             });
         } catch (error) {
             console.error('Error creating symbolic link:', error);
         }
     }
 
+    getSoftwareDownloadUrl(software,) {
+        const source_local = software.source_local;
+        const applications = 'softlist/static_src/applications/';
+        const software_library = 'softlist/static_src/software_library/';
+        if (source_local) {
+            const localUrl = gdir.getLocalStaticApiUrl(software_library);
+            return `${localUrl}/${source_local}`
+        } else {
+            const target = software.target;
+            const mainDir = file.getLevelPath(target, 2);
+            const softwareZipName = `${mainDir}.zip`
+            const downloadUrl = gdir.getLocalStaticApiUrl(`${applications}/${softwareZipName}`);
+            return downloadUrl
+        }
+    }
+
+    installProgressProcess(progress, readyDownload, downloading, message, installProgress, progressCallback, callback) {
+        if (progress == -1) {
+            if (progressCallback) progressCallback(-1, message)
+            if (callback) callback();
+            return
+        } else {
+            installProgress.value = progress / 3
+            if (progressCallback) progressCallback(installProgress.value)
+        }
+    }
+
+    searchInstallerExe(dir) {
+        if (fs.existsSync(dir)) {
+            const stats = fs.statSync(dir);
+            if (stats.isFile()) {
+                dir = path.dirname(dir);
+            }
+            while (file.hasOnlyOneSubdirectory(dir)) {
+                dir = path.join(dir, fs.readdirSync(dir)[0]);
+            }
+            const files = fs.readdirSync(dir);
+            let exeCount = 0;
+            let installerPath = null;
+            for (const file of files) {
+                const filePath = path.join(dir, file);
+                if (file.endsWith('.exe')) {
+                    exeCount++;
+                    installerPath = filePath;
+                }
+                if (file.includes('setup.exe')) {
+                    return filePath;
+                }
+            }
+            if (exeCount === 1) {
+                return installerPath;
+            }
+        } else {
+            return null;
+        }
+    }
     async installSoftware(software, progressCallback, callback) {
         const installDir = software.appDir;
         const basename = software.basename;
@@ -245,13 +302,48 @@ class Softinstall extends Base {
             child_process.exec(installCommand);
         } else if (software.install_type === 'installer') {
             const installPath = path.join(installDir, basename);
+            let dest = path.join(download, software.source_local);
             if (!fs.existsSync(installPath)) {
-                const fileUrl = gdir.getLocalStaticApiUrl(`${software_library}/${source_local}.exe`);
-                const localFilePath = await httptool.downloadFile(fileUrl, progressCallback);
-                zip.putUnZipTask(localFilePath, installDir, progressCallback);
+                if (!fs.existsSync(dest)) {
+                    const downloadUrl = this.getSoftwareDownloadUrl(software);
+                    dest = await httptool.downloadFile(downloadUrl, dest, (progress, readyDownload, downloading, message) => {
+                        this.installProgressProcess(progress, readyDownload, downloading, message, installProgress, progressCallback, callback)
+                    });
+                }
+                const unzipDir = path.join(download, path.basename(software.source_local, path.extname(software.source_local)));
+
+                const timer = setInterval(() => {
+                    if (installProgress.value < 99) {
+                        installProgress.value++;
+                        if (progressCallback) progressCallback(installProgress.value);
+                    } else {
+                        if (timer) clearInterval(timer);
+                        if (callback) callback();
+                        return
+                    }
+                }, 1000);
+
+                if (fs.existsSync(unzipDir)) {
+                    let installerExe = this.searchInstallerExe(unzipDir)
+                    await plattool.runAsAdmin(installerExe, (progress, message) => {
+                        if (callback) callback()
+                    });
+                    return
+                }
+                zip.putUnZipTask(dest, unzipDir, async () => {
+                    if (progressCallback) progressCallback(100);
+                    if (timer) clearInterval(timer);
+                    // file.delete(dest)
+                    let installerExe = this.searchInstallerExe(unzipDir)
+                    await plattool.runAsAdmin(installerExe, (progress, message) => {
+                        if (callback) callback()
+                    });
+                    return
+                }, (progress) => {
+                    console.log(`progress`, progress)
+                });
             }
         } else if (software.source_local || typeof software.source_local === 'string') {
-
             let installer = false
             const destDir = path.join(download, software.source_local);
             if (software.source_local === 'installer') {
@@ -261,14 +353,7 @@ class Softinstall extends Base {
             if (!fs.existsSync(target)) {
                 const downloadUrl = gdir.getLocalStaticApiUrl(`${software_library}/${software.source_local}`);
                 const localFilePath = await httptool.downloadFile(downloadUrl, destDir, (progress, readyDownload, downloading, message) => {
-                    if (progress == -1) {
-                        if (progressCallback) progressCallback(-1, message)
-                        if (callback) callback();
-                        return
-                    } else {
-                        installProgress.value = progress / 3
-                        if (progressCallback) progressCallback(installProgress.value)
-                    }
+                    this.installProgressProcess(progress, readyDownload, downloading, message, installProgress, progressCallback, callback)
                 });
                 if (localFilePath && localFilePath.dest) {
                     const dest = localFilePath.dest

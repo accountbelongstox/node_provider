@@ -5,7 +5,8 @@ const Base = require('../base/base');
 const http = require('http')
 class Gdir extends Base {
     intranetIPAddress = `http://192.168.100.5/`
-    localStaticApiUrl = `https://static.local.12gm.com:905/`
+    localStaticHttpsApiUrl = `https://static.local.12gm.com:905/`
+    localStaticHttpApiUrl = `http://static.local.12gm.com:805/`
     testAccessibleApi = null
     constructor() {
         super()
@@ -59,7 +60,7 @@ class Gdir extends Base {
             await this.testUrl(this.intranetIPAddress);
             return this.intranetIPAddress
         } catch (error) {
-            return this.localStaticApiUrl
+            return this.localStaticHttpApiUrl
         }
     }
     async testUrl(url) {
@@ -77,8 +78,8 @@ class Gdir extends Base {
         });
     }
     getLocalStaticApiUrl(upath) {
-        if (upath) return this.localStaticApiUrl + upath
-        return this.localStaticApiUrl
+        if (upath) return this.localStaticHttpApiUrl + upath
+        return this.localStaticHttpApiUrl
     }
     async getLocalStaticApiTestUrl(upath) {
         if(!this.testAccessibleApi)this.testAccessibleApi = await this.testLocalApiUrls()

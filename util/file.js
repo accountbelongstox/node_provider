@@ -209,7 +209,7 @@ class File extends Base {
         if (!fs.existsSync(publicPath)) {
             fs.mkdirSync(publicPath, { recursive: true });
         }
-        if(!fpath)return publicPath
+        if (!fpath) return publicPath
         if (!path.isAbsolute(fpath)) {
             return path.join(publicPath, fpath);
         }
@@ -221,8 +221,8 @@ class File extends Base {
         if (!fs.existsSync(resource)) {
             fs.mkdirSync(resourcePath, { recursive: true });
         }
-        
-        if(!filename)return resourcePath
+
+        if (!filename) return resourcePath
         if (!path.isAbsolute(filename)) {
             return path.join(resourcePath, filename);
         }
@@ -420,8 +420,8 @@ class File extends Base {
         return `data:${mimeType};base64,${base64Image}`;
     }
 
-    symlinkSync(src, target,force = false) {
-        this.symlink(src, target,force)
+    symlinkSync(src, target, force = false) {
+        this.symlink(src, target, force)
     }
 
     slicePathLevels(filePath, levels) {
@@ -624,7 +624,7 @@ class File extends Base {
             const fileSizeInBytes = stats.size;
             return fileSizeInBytes;
         } catch (error) {
-            return -1; 
+            return -1;
         }
     }
 
@@ -649,7 +649,7 @@ class File extends Base {
         }
         try {
             const stats = fs.statSync(fp);
-            return stats.mtime.getTime(); 
+            return stats.mtime.getTime();
         } catch (error) {
             console.error(`Error getting modification time: ${error.message}`);
             return 0;
@@ -797,6 +797,7 @@ class File extends Base {
             const stats = fs.lstatSync(folderPath);
             return stats.isSymbolicLink();
         } catch (error) {
+            console.log(`isSymbolicLink-Error`,error)
             return false;
         }
     }
@@ -1767,6 +1768,29 @@ class File extends Base {
             const newFilePath = path.join(path.dirname(filePath), `${fileName.replace(originalExtension, '')}.${newExtension}`);
             return newFilePath;
         }
+    }
+    hasOnlyOneSubdirectory(dir) {
+        try {
+            const stats = fs.statSync(dir);
+            if (!stats.isDirectory()) {
+                return false;
+            }
+        } catch (error) {
+            console.log(`hasOnlyOneSubdirectory-Error: `,error);
+            return false;
+        }
+        const items = fs.readdirSync(dir);
+        let subdirectoryCount = 0;
+        for (const item of items) {
+            const itemPath = path.join(dir, item);
+            if (fs.statSync(itemPath).isDirectory()) {
+                if (subdirectoryCount > 1) {
+                    return false;
+                }
+                subdirectoryCount ++
+            }
+        }
+        return subdirectoryCount === 1;
     }
 }
 File.toString = () => '[class File]';
