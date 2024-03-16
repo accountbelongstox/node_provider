@@ -163,28 +163,24 @@ class Softinstall extends Base {
                 ['C:/ProgramData/Adobe', 'Adobe_ProgramData'],
             ]
             this.linkToDirs(links, appDir, true)
-        }
-        else if (mainDirLow.startsWith('bravesoftware')) {
+        } else if (mainDirLow.startsWith('bravesoftware')) {
             const links = [
                 ['C:/Program Files/BraveSoftware', 'BraveSoftware'],
             ]
             this.linkToDirs(links, appDir, false)
-        }
-        else if (mainDirLow.startsWith('avg')) {
+        } else if (mainDirLow.startsWith('avg')) {
             const links = [
                 [gdir.getUserProfileDir('AppData/Local/AVG'), 'AVG'],
             ]
             this.linkToDirs(links, appDir, false)
-        }
-        else if (mainDirLow.startsWith('google')) {
+        } else if (mainDirLow.startsWith('google')) {
             const links = [
                 [gdir.getUserProfileDir('AppData/Local/Google'), 'Google'],
                 ['C:/Program Files/Google', 'Google'],
                 ['C:/Program Files (x86)/Google', 'Google/x86'],
             ]
             this.linkToDirs(links, appDir, false)
-        }
-        else if (mainDirLow.startsWith('microsoft visual studio')) {
+        } else if (mainDirLow.startsWith('microsoft visual studio')) {
             const links = [
                 ['C:/CocosDashboard', 'CocosDashboard'],
                 ['C:/Program Files (x86)/Microsoft Visual Studio', 'MicrosoftVisualStudio_x86Dir'],
