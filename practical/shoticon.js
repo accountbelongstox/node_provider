@@ -10,14 +10,11 @@ const { file, strtool, httptool, tool } = require('../utils.js');
 const { gdir, env } = require('../globalvars.js');
 const { Console } = require('console');
 let pngImgToIco;
-
-const icon_width = parseInt(env.getEnv('DESKTOP_ICON_WIDTH', 50));
-
 const config = {}
 const ShortcutQureyAsync = util.promisify(winShortcut.query);
 const ShortcutEditAsync = util.promisify(winShortcut.edit);
 const ShortcutCreateAsync = util.promisify(winShortcut.create);
-const { nativeImage, app } = electron;
+const { nativeImage, app,screen } = electron;
 
 class Main {
     iconCache = {};
@@ -34,6 +31,22 @@ class Main {
     converToErrorImgs = []
 
     constructor() {
+    }
+
+    getIconWidth() {
+        let icon_width = parseInt(env.getEnv('DESKTOP_ICON_WIDTH', 50));
+        try{
+            const primaryDisplay = screen.getPrimaryDisplay();
+            const { width, height } = primaryDisplay.workAreaSize;
+            if(width <= 1920){
+                icon_width = 30
+            }
+            env.setEnv('DESKTOP_ICON_WIDTH', icon_width)
+        }catch(e){
+            console.log(e)
+        }
+        return icon_width
+
     }
 
     getShortcutIconList() {
@@ -275,7 +288,7 @@ class Main {
             const gid = this.genGid(groupname);
             jsonData[index].border = tool.getRandomItem(borders)
             jsonData[index].gid = gid
-            jsonData[index].icon_width = icon_width
+            jsonData[index].icon_width = this.getIconWidth()
             for (let i = 0; i < softwareList.length; i++) {
                 const softwareItem = softwareList[i];
                 const basename = softwareItem.basename;
@@ -296,7 +309,7 @@ class Main {
         let updateConf = {
             groupname,
             softConf,
-            icon_width: icon_width,
+            icon_width: this.getIconWidth(),
             gid,
             img_id: this.genImgId(basename)
         }
@@ -820,7 +833,7 @@ class Main {
                 let target = softwareItem.target;
                 let exe_path = softwareItem.path;
                 jsonData[index].softwareList[i].appDir = appDir
-                jsonData[index].softwareList[i].icon_width = icon_width
+                jsonData[index].softwareList[i].icon_width = this.getIconWidth()
 
                 if (appDir) {
                     if (!file.isAbsolute(iconPath)) {

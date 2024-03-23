@@ -87,7 +87,7 @@ class Gdir extends Base {
         return this.testAccessibleApi
     }
     getLocalDir(subDir) {
-        const homeDir = this.getHomeDir(`.the_by_node`);
+        const homeDir = this.getHomeDir(`.desktop_by_node`);
         const fullPath = subDir ? path.join(homeDir, subDir) : homeDir;
         if (fullPath && !fs.existsSync(fullPath)) {
             fs.mkdirSync(fullPath, { recursive: true });
@@ -95,7 +95,7 @@ class Gdir extends Base {
         return fullPath;
     }
     getLocalFile(subDir) {
-        const dir = this.getHomeDir(`.the_by_node`);
+        const dir = this.getHomeDir(`.desktop_by_node`);
         const fullPath = subDir ? path.join(dir, subDir) : dir;
         this.mkbasedir(fullPath)
         return fullPath;
