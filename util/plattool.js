@@ -204,7 +204,7 @@ class Plattools extends Base {
                 }
                 timer = setTimeout(() => {
                     if (!callbackExecuted) {
-                        callback(this.wrapEmdResult(true, stdoutData, null, 0, info));
+                        if(callback)callback(this.wrapEmdResult(true, stdoutData, null, 0, info));
                         callbackExecuted = true;
                         // childProcess.kill(); 
                     }

@@ -1,5 +1,5 @@
 const path = require('path');
-const { exec } = require('child_process');
+// const { exec } = require('child_process');
 const fs = require('fs');
 const Base = require('../base/base');
 const { getnode,porttool } = require('../../node_provider/utils.js');
@@ -8,7 +8,8 @@ const { getnode,porttool } = require('../../node_provider/utils.js');
 // const indexDir = "." + path.dirname(mainServer.indexPath)
 // const distDir = path.join(appRoot, indexDir)
 const http = require('http');
-const { strtool, urltool, file, plattool, setenv, env } = require('../utils.js');
+const { env } = require('../globalvars.js');
+const { strtool, urltool, file, plattool, setenv } = require('../utils.js');
 let electronShell = null
 
 class Serve extends Base {

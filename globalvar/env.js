@@ -7,192 +7,152 @@ const writeFileAsync = promisify(fs.writeFile);
 const Base = require('../base/base');
 
 class Env extends Base {
+    static annotationSymbol = '#';
+    envContent = null
+    initEnv = false;
 
-    mainEnvFile = null;
-    annotationSymbol = "#";
-    constructor(rootDir = null, envName = ".env", delimiter = "=") {
-        super()
-        if(!rootDir)rootDir = this.getCwd();
-        this.setRootDir(rootDir, envName, delimiter);
-    }
-    getCwd() {
-        return process.cwd();
-    }
-    setDelimiter(delimiter = "=") {
+    constructor(rootDir = null, envName = '.env', delimiter = '=') {
+        super();
+        this.rootDir = rootDir || process.cwd();
+        this.envName = envName;
         this.delimiter = delimiter;
     }
-    async exampleTo(examplePath) {
-        const envFile = examplePath.replace("-example", "").replace("_example", "").replace(".example", "");
-        await this.mergeEnv(envFile, examplePath);
-    }
-    async setRootDir(rootDir, envName = ".env", delimiter = "=") {
-        this.setDelimiter(delimiter);
-        this.rootDir = rootDir;
-        this.localEnvFile = path.join(this.rootDir, envName);
-        this.exampleEnvFile = path.join(this.rootDir, `${envName}_example`);
-        if (!fs.existsSync(this.exampleEnvFile)) {
-            this.exampleEnvFile = path.join(this.rootDir, `${envName}-example`);
+
+    _init() {
+        if (!this.initEnv) {
+            this.initEnv = true;
+            this.localEnvFile = this._getLocalEnvFile();
+            this.exampleEnvFile = this._getExampleEnvFile();
+            this.mergeEnv(this.localEnvFile, this.exampleEnvFile);
         }
-        if (!fs.existsSync(this.exampleEnvFile)) {
-            this.exampleEnvFile = path.join(this.rootDir, `${envName}.example`);
-        }
-        await this.getLocalEnvFile();
     }
-    async load(rootDir, envName = ".env", delimiter = "=") {
-        return new Env(rootDir, envName, delimiter);
+
+    _getLocalEnvFile() {
+        const localEnvFile = path.join(this.rootDir, this.envName);
+        return localEnvFile;
     }
-    async getLocalEnvFile() {
-        if (!fs.existsSync(this.localEnvFile)) {
-            fs.writeFileSync(this.localEnvFile, "");
-        }
-        await this.mergeEnv(this.localEnvFile, this.exampleEnvFile);
-        return this.localEnvFile;
-    }
-    getEnvFile() {
-        return this.localEnvFile;
-    }
-    arrToDict(array) {
-        const result = {};
-        for (const item of array) {
-            if (Array.isArray(item) && item.length > 1) {
-                const [key, val] = item;
-                result[key] = val;
+
+    _getExampleEnvFile() {
+        const exampleFiles = [
+            path.join(this.rootDir, `${this.envName}_example`),
+            path.join(this.rootDir, `${this.envName}-example`),
+            path.join(this.rootDir, `${this.envName}.example`),
+        ];
+        for (const exampleFile of exampleFiles) {
+            if (fs.existsSync(exampleFile)) {
+                return exampleFile;
             }
         }
-        return result;
+        return null;
     }
-    dictToArr(dictionary) {
-        const result = [];
-        for (const [key, value] of Object.entries(dictionary)) {
-            result.push([key, value]);
-        }
-        return result;
+
+    static load(rootDir, envName = '.env', delimiter = '=') {
+        return new Env(rootDir, envName, delimiter);
     }
-    async mergeEnv(envFile, exampleEnvFile) {
-        if (!fs.existsSync(exampleEnvFile)) {
+
+    mergeEnv(envFile, exampleEnvFile) {
+        if (!exampleEnvFile) {
             return;
         }
         const exampleArr = this.readEnv(exampleEnvFile);
         const localArr = this.readEnv(envFile);
-        const addedKeys = [];
-        const exampleDict = this.arrToDict(exampleArr);
-        const localDict = this.arrToDict(localArr);
-        for (const [key, value] of Object.entries(exampleDict)) {
-            if (!(key in localDict)) {
-                localDict[key] = value;
-                addedKeys.push(key);
-            }
-        }
+        const exampleDict = Env.arrToDict(exampleArr);
+        const localDict = Env.arrToDict(localArr);
+        const addedKeys = Object.keys(exampleDict).filter(key => !localDict.hasOwnProperty(key));
+        addedKeys.forEach(key => localDict[key] = exampleDict[key]);
         if (addedKeys.length > 0) {
             console.log(`Env-Update env: ${envFile}`);
-            const updatedArr = this.dictToArr(localDict);
-            await this.saveEnv(updatedArr, envFile);
-        }
-        for (const addedKey of addedKeys) {
-            console.log(`Env-Added key: ${addedKey}`);
+            const updatedArr = Env.dictToArr(localDict);
+            this.saveEnv(updatedArr, envFile);
+            addedKeys.forEach(key => console.log(`Env-Added key: ${key}`));
         }
     }
+
     readKey(key) {
-        const content = fs.readFileSync(this.mainEnvFile, 'utf8');
-        const lines = content.split('\n');
-        for (const line of lines) {
-            const [k, v] = line.split(this.delimiter);
+        this._init();
+        const content = fs.readFileSync(this.localEnvFile, 'utf8');
+        for (const line of content.split('\n')) {
+            const [k, v] = line.trim().split(this.delimiter, 2);
             if (k.trim() === key) {
                 return v.trim();
             }
         }
         return null;
     }
+
     replaceOrAddKey(key, val) {
-        let updated = false;
         const lines = [];
-        const content = fs.readFileSync(this.mainEnvFile, 'utf8');
-        const fileLines = content.split('\n');
-        for (const line of fileLines) {
-            const [k, v] = line.split(this.delimiter);
+        const content = fs.readFileSync(this.localEnvFile, 'utf8');
+        for (const line of content.split('\n')) {
+            const [k, v] = line.trim().split(this.delimiter, 2);
             if (k.trim() === key) {
                 lines.push(`${key}${this.delimiter}${val}`);
-                updated = true;
             } else {
-                lines.push(line);
+                lines.push(line.trim());
             }
         }
-        if (!updated) {
+        if (!lines.some(line => line.startsWith(`${key}${this.delimiter}`))) {
             lines.push(`${key}${this.delimiter}${val}`);
         }
-        const updatedContent = lines.join('\n');
-        fs.writeFileSync(this.mainEnvFile, updatedContent);
+        const updatedContent = lines.join('\n') + '\n';
+        fs.writeFileSync(this.localEnvFile, updatedContent);
     }
-    readEnv(filePath = null) {
-        if (filePath === null) {
-            filePath = this.localEnvFile;
+
+    readEnv(filePath) {
+        const content = fs.readFileSync(filePath, 'utf8').trim();
+        return content.split('\n').map(line => line.trim().split(this.delimiter, 2));
+    }
+
+    getEnvs(filePath = null) {
+        return this.readEnv(filePath || this.localEnvFile);
+    }
+
+    saveEnv(envArr, filePath) {
+        const content = envArr.map(([k, v]) => `${k}${this.delimiter}${v}`).join('\n') + '\n';
+        fs.writeFileSync(filePath, content);
+    }
+
+    setEnv(key, value, filePath = null) {
+        this._init();
+        filePath = filePath || this.localEnvFile;
+        const envArr = this.readEnv(filePath);
+        const updatedArr = envArr.map(([k, v]) => (k === key ? [k, value] : [k, v]));
+        if (!updatedArr.some(([k]) => k === key)) {
+            updatedArr.push([key, value]);
         }
-        const content = fs.readFileSync(filePath, 'utf8');
-        const lines = content.split('\n');
-        const result = lines.map(line => line.split(this.delimiter).map(value => value.trim()));
+        this.saveEnv(updatedArr, filePath);
+    }
+
+    isEnv(key, filePath = null) {
+        this._init();
+        const val = this.getEnv(key, filePath);
+        const result = Boolean(val);
+        if (process.argv.includes('is_env')) {
+            console.log(result ? 'True' : 'False');
+        }
         return result;
     }
-    getEnvs(filePath = null) {
-        return this.readEnv(filePath);
-    }
-    async saveEnv(envArr, filePath = null) {
-        if (filePath === null) {
-            filePath = this.localEnvFile;
-        }
-        const filteredEnvArr = envArr.filter(subArr => subArr.length === 2);
-        const formattedLines = filteredEnvArr.map(subArr => `${subArr[0]}${this.delimiter}${subArr[1]}`);
-        const resultString = formattedLines.join('\n');
-        await this.saveFile(filePath, resultString, true);
-    }
-    async setEnv(key, value, filePath = null) {
-        if (filePath === null) {
-            filePath = this.localEnvFile;
-        }
+
+    getEnv(key, default_val=``, filePath = null) {
+        this._init();
+        filePath = filePath || this.localEnvFile;
         const envArr = this.readEnv(filePath);
-        let keyExists = false;
-        for (const subArr of envArr) {
-            if (subArr[0] === key) {
-                subArr[1] = value;
-                keyExists = true;
-                break;
+        for (const [k, v] of envArr) {
+            if (k === key) {
+                return v;
             }
         }
-        if (!keyExists) {
-            envArr.push([key, value]);
-        }
-        await this.saveEnv(envArr, filePath);
+        return default_val;
     }
-    isEnv(key, filePath = null) {
-        const isArg = process.argv.includes("is_env");
-        const val = this.getEnv(key, filePath);
-        if (val === "") {
-            if (isArg) {
-                console.log("False");
-            }
-            return false;
-        }
-        if (isArg) {
-            console.log("True");
-        }
-        return true;
+
+    static arrToDict(array) {
+        return Object.fromEntries(array);
     }
-    getEnv(key,defaultValue="", filePath = null) {
-        if (filePath === null) {
-            filePath = this.localEnvFile;
-        }
-        const envArr = this.readEnv(filePath);
-        for (const subArr of envArr) {
-            if (subArr[0] === key) {
-                return subArr[1];
-            }
-        }
-        return defaultValue;
-    }
-    async saveFile(filePath, content, overwrite) {
-        if (!fs.existsSync(filePath) || overwrite) {
-            await writeFileAsync(filePath, content);
-        }
+
+    static dictToArr(dictionary) {
+        return Object.entries(dictionary);
     }
 }
+
 Env.toString = () => '[class Env]';
 module.exports = new Env();

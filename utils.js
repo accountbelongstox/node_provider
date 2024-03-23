@@ -16,7 +16,6 @@ const sysarg = require('./util/sysarg.js');
 const setenv = require('./util/setenv.js');
 const zip = require('./util/zip.js');
 const getnode = require('./util/getnode.js');
-const env = require('./util/env.js');
 const porttool = require('./util/porttool.js');
 const httptool = require('./util/httptool.js');
 
@@ -38,7 +37,6 @@ module.exports = {
     log,
     sysarg,
     setenv,
-    env,
     zip,
     getnode,
     porttool,
