@@ -821,7 +821,8 @@ class Main {
         return jsonData
     }
     checkIconFileIsExists(jsonData) {
-        const appDir = env.getEnv('DESKTOP_APP_DIR')
+        const appDir = (env.getEnv('DESKTOP_APP_DIR') || file.readFile(gdir.getLocalInfoFile('appdir_info.ini'))).trim()
+         
         for (let index = 0; index < jsonData.length; index++) {
             const item = jsonData[index];
             const softwareList = item['softwareList'];

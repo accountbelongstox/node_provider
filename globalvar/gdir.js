@@ -94,6 +94,22 @@ class Gdir extends Base {
         }
         return fullPath;
     }
+    getLocalInfoDir(subDir) {
+        const homeDir = this.getLocalDir(`.info`);
+        const fullPath = subDir ? path.join(homeDir, subDir) : homeDir;
+        if (fullPath && !fs.existsSync(fullPath)) {
+            fs.mkdirSync(fullPath, { recursive: true });
+        }
+        return fullPath;
+    }
+    getLocalInfoFile(subDir) {
+        const homeDir = this.getLocalInfoDir();        
+        if (homeDir && !fs.existsSync(homeDir)) {
+            fs.mkdirSync(homeDir, { recursive: true });
+        }
+        const fullPath = subDir ? path.join(homeDir, subDir) : homeDir;
+        return fullPath;
+    }
     getLocalFile(subDir) {
         const dir = this.getHomeDir(`.desktop_by_node`);
         const fullPath = subDir ? path.join(dir, subDir) : dir;

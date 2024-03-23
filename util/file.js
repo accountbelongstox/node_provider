@@ -19,6 +19,7 @@ class File extends Base {
     execCountTasks = 0
     copyDirectoryCallbak = {}
 
+    
     getEncode(file_name, encoding = null, info = false) {
         const codings = [
             "utf-8",
@@ -793,6 +794,9 @@ class File extends Base {
     }
 
     isSymbolicLink(folderPath) {
+        if(!fs.existsSync(folderPath)){
+            return false
+        }
         try {
             const stats = fs.lstatSync(folderPath);
             return stats.isSymbolicLink();

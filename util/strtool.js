@@ -265,6 +265,15 @@ class StrTool {
         return match ? match[0] : ``;
     }
 
+    truncate(result, maxLength=100, truncateLength=50) {
+        let resultStr = this.toString(result); 
+        if (resultStr.length > maxLength) { 
+            let startStr = resultStr.substring(0, truncateLength);
+            let endStr = resultStr.substring(resultStr.length - truncateLength); 
+            resultStr = startStr + '...' + endStr; 
+        }
+        return resultStr;
+    }
 }
 
 module.exports = new StrTool();
