@@ -18,7 +18,10 @@ class Browser {
     getBrowserSize() {
         return {
             width: window.innerWidth,
-            height: window.innerHeight
+            height: window.innerHeight  
+            // 以上两个方法是一样的
+            // width: document.documentElement.clientWidth,
+            // height: document.documentElement.clientHeight    
         }
     }
 }
