@@ -20,12 +20,12 @@ class ElectronInstance extends Base {
         const devConfig = binConfig.dev
         const frontendConfig = devConfig.frontend
         let frontendDirectory = frontendConfig.directory
-        console.log(`devConfig`,devConfig)
-        console.log(`frontendDirectory`,frontendDirectory)
-        if(frontendDirectory.includes(`/`)){
+        console.log(`devConfig`, devConfig)
+        console.log(`frontendDirectory`, frontendDirectory)
+        if (frontendDirectory.includes(`/`)) {
             frontendDirectory = frontendDirectory.split('/')
-            console.log(`frontendDirectory`,frontendDirectory)
-            frontendDirectory = frontendDirectory[frontendDirectory.length -1 ]
+            console.log(`frontendDirectory`, frontendDirectory)
+            frontendDirectory = frontendDirectory[frontendDirectory.length - 1]
         }
         const nodeByBinConfig = frontendConfig.node
         getnode.getNpmByConfig(nodeByBinConfig).then(async (npmExec) => {
@@ -36,11 +36,15 @@ class ElectronInstance extends Base {
             let npmOriginExe = ''
             const searchString = 'npm';
             for (let i = 0; i < defaultConfigLines.length; i++) {
-                const items = defaultConfigLines[i].split(':');
+                const items = defaultConfigLines[i].split('cmd:');
+                console.log(`items[1] ${items[1]}`)
                 if (items.length > 1 && items[1].includes(searchString)) {
+
+                    console.log(`nodeByBinConfig ${nodeByBinConfig}`)
+                    console.log(`npmExec ${npmExec}`)
                     npmOriginExe = items[1]
                     items[1] = npmSuffix;
-                    defaultConfigLines[i] = items.join(':');
+                    defaultConfigLines[i] = items.join('cmd:');
                 }
             }
             const modifiedContent = defaultConfigLines.join('\n');
@@ -58,33 +62,34 @@ class ElectronInstance extends Base {
             const desktop_by_npm_frontend_file = gdir.getLocalInfoFile('.desktop_by_frontend_npm.ini')
             const desktop_by_yarn_frontend_file = gdir.getLocalInfoFile('.desktop_by_frontend_yarn.ini')
             const desktop_by_node_frontenddir_file = gdir.getLocalInfoFile('.desktop_by_frontend_dir.ini')
-            file.saveFile(desktop_by_node_frontend_file,nodeByBinConfig)
-            file.saveFile(desktop_by_npm_frontend_file,path.normalize(npmExec))
-            file.saveFile(desktop_by_yarn_frontend_file,path.normalize(yarnExe))
-            file.saveFile(desktop_by_node_frontenddir_file,path.normalize(gdir.getRootDir(frontendDirectory)))
-            this.success( `File ${desktop_by_node_frontend_file} has been updated.`  )
-            this.success( `File ${desktop_by_npm_frontend_file} has been updated.`  )
-            this.success( `File ${desktop_by_yarn_frontend_file} has been updated.`  )
-            this.success( `File ${desktop_by_node_frontenddir_file} has been updated.`  )
+            file.saveFile(desktop_by_node_frontend_file, nodeByBinConfig)
+            file.saveFile(desktop_by_npm_frontend_file, path.normalize(npmExec))
+            file.saveFile(desktop_by_yarn_frontend_file, path.normalize(yarnExe))
+            file.saveFile(desktop_by_node_frontenddir_file, path.normalize(gdir.getRootDir(frontendDirectory)))
+            this.success(`File ${desktop_by_node_frontend_file} has been updated.`)
+            this.success(`File ${desktop_by_npm_frontend_file} has been updated.`)
+            this.success(`File ${desktop_by_yarn_frontend_file} has been updated.`)
+            this.success(`File ${desktop_by_node_frontenddir_file} has been updated.`)
             this.success(`The desktop front-end operating environment is ready.`)
             if (callback) callback()
         })
     }
 
-    async getRunEnviromentInfo(callback){
+    async getRunEnviromentInfo(callback) {
+        console.log(process)
         const binConfig = conf.getAllAppBinConf()
         const devConfig = binConfig.dev
         const frontendConfig = devConfig.frontend
         const nodeByBinConfig = frontendConfig.node
         const npm_exe = await getnode.getNpmByConfig(nodeByBinConfig)
         const yarnExe = await getnode.getYarnByNodeVersion(nodeByBinConfig)
-        const info =  {
+        const info = {
             nodeVersion: process.version,
             frontendNodeVersion: nodeByBinConfig,
-            frontendNpm: npm_exe, 
-            frontendYarn: yarnExe, 
+            frontendNpm: npm_exe,
+            frontendYarn: yarnExe,
         }
-        if(callback)callback(info)
+        if (callback) callback(info)
         return info
     }
 

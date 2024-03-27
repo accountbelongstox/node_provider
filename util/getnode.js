@@ -43,7 +43,7 @@ class Getnode extends Base {
         const currentOS = this.getCurrentOS();
         let tmpDir = '/usr/nodes';
         if (currentOS === 'win32') {
-            tmpDir = `D:/lang_compiler/nodes`;
+            tmpDir = `D:/lang_compiler`;
         }
         if (npath) tmpDir = path.join(tmpDir, npath)
         this.mkdir(tmpDir)
