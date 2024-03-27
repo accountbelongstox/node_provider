@@ -27,6 +27,8 @@ class MountEgg extends Base {
 	constructor() {
 		super()
 	}
+	
+	//modify
 
 	async start() {
 		if (!file.isDir(appsDir)) {
