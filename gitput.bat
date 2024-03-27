@@ -14,6 +14,6 @@ set "timestamp=%year%-%month%-%day% %hour%:%minute%:%second%"
 REM git
 git add .
 git commit -m "%timestamp%"
-git push --set-upstream origin master
+git push --set-upstream origin main
 
 endlocal
