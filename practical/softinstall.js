@@ -1,15 +1,15 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const axios = require('axios');
-const fetch = require('node-fetch');
-const child_process = require('child_process');
 const { gdir } = require('../globalvars.js');
-const Base = require('../base/base');
-const { httptool, zip, file, plattool } = require('../utils.js');
+const Base = require('../base/base.js');
+const { httptool, zip, file, plattool, strtool, fpath } = require('../utils.js');
+const { execSync } = require('child_process');
+const shoticon = require('./shoticon.js');
 
 class Softinstall extends Base {
     installQueue = {}
+    installSchedulingQueue = {}
     isQueueRunning = false;
     installation_socket_event_name = `installer`
 
@@ -17,37 +17,78 @@ class Softinstall extends Base {
         super();
     }
 
-    addInstallQueue(software) {
-        if (!software || typeof software !== 'object') {
+    addInstallQueue(softwareOrg) {
+        if (!softwareOrg || typeof softwareOrg !== 'object') {
             console.error('Invalid software object.');
             return;
         }
-
-        if (!software.hasOwnProperty('basename')) {
+        if (!softwareOrg.hasOwnProperty('basename')) {
             console.error('Software object must have a basename property.');
             return;
         }
 
-        const { basename } = software;
+        const { basename } = softwareOrg;
 
         if (basename in this.installQueue) {
             console.warn(`${basename} is already in the installation queue.`);
             return;
         }
 
-        this.installQueue[basename] = software;
+        this.installQueue[basename] = {
+            installingProgress: 0,
+            ...softwareOrg
+        };
 
-        httptool.eggSocket(this.installation_socket_event_name, {
-            type: 'add',
-            message: `Added ${basename} to the installation queue`,
-            progress: 0,
-            basename,
-            aid: software.aid,
-        });
+        const software = this.installQueue[basename];
+
+        this.installSchedulingQueue[basename] = {
+            setProgress: (val, notify = true) => {
+                if (val === undefined) {
+                    software.installingProgress = val
+                }
+                if (notify) this.notifyBySocket(software, "install", `The current installation progress.`)
+            },
+            addProgress: (max = 100, notify = true) => {
+                if (software.installingProgress < max) {
+                    software.installingProgress++
+                }
+                if (notify) this.notifyBySocket(software, "install", `The current installation progress.`)
+            },
+            doneProgress: (notify = false) => {
+                software.installingProgress = 100
+                if (notify) this.notifyBySocket(software, "install", `The installation has been completed and the installation was successful..`)
+            },
+            fail: (msg=`The current installation status is failed...`,notify = true) => {
+                software.installingProgress = -1
+                delete this.installSchedulingQueue[basename]
+                if (notify) this.notifyBySocket(software, "install", msg)
+                this.popInstallQueue()
+            },
+            done: (notify = true) => {
+                software.installingProgress = 100
+                delete this.installSchedulingQueue[basename]
+                software.isExist = file.isFile(software.target);
+                if (notify) this.notifyBySocket(software, "install", `The installation has been completed and the installation was successful..`)
+                this.popInstallQueue()
+            },
+            ...softwareOrg
+        };
+        this.notifyBySocket(software, "install", `Added ${basename} to the installation queue`)
 
         if (!this.isQueueRunning) {
             this.popInstallQueue();
         }
+    }
+
+    notifyBySocket(software, notifyType = "install", message) {
+        if (!message) message = `Added ${basename} to the installation queue`
+        const basename = software.basename;
+        httptool.eggSocket(this.installation_socket_event_name, {
+            notifyType: notifyType,
+            message,
+            ...software,
+
+        });
     }
 
     popInstallQueue() {
@@ -55,82 +96,16 @@ class Softinstall extends Base {
         if (queueLength > 0) {
             const keys = Object.keys(this.installQueue);
             const firstKey = keys[0];
-            const software = this.installQueue[firstKey];
+            const software = this.installSchedulingQueue[firstKey];
             delete this.installQueue[firstKey];
             const basename = software.basename;
-            httptool.eggSocket(this.installation_socket_event_name, {
-                type: 'pop',
-                installMessage: `Installing ${software.basename}`,
-                progress: 1,
-                basename,
-                aid: software.aid,
-            });
-            this.installSoftware(software, (installingProgress, installMessage) => {
-                installMessage = installMessage ? installMessage : `Installing ${software.basename}`
-                httptool.eggSocket(this.installation_socket_event_name, {
-                    type: 'progress',
-                    installMessage,
-                    installingProgress,
-                    ...software
-                });
-            }
-                ,
-                () => {
-                    software.isExist = file.isFile(software.target);
-                    httptool.eggSocket(this.installation_socket_event_name, {
-                        type: 'done',
-                        installMessage: `Installed ${software.basename}`,
-                        installingProgress: 100,
-                        ...software
-                    });
-                    this.popInstallQueue()
-                });
+            this.notifyBySocket(software, "install", `Added ${basename} to the installation queue`)
+            this.installSoftware(software);
         } else {
             this.isQueueRunning = false
         }
     }
 
-    compareJSON(objA, objB) {
-        if (typeof objA !== 'object' || typeof objB !== 'object') {
-            return false;
-        }
-        const keysA = Object.keys(objA);
-        const keysB = Object.keys(objB);
-        if (keysA.length !== keysB.length) {
-            return false;
-        }
-        for (const key of keysA) {
-            if (typeof objA[key] === 'object' && typeof objB[key] === 'object') {
-                if (!this.compareJSON(objA[key], objB[key])) {
-                    return false;
-                }
-            } else if (objA[key] !== objB[key]) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    parseSoftwareGroups(mergedSoftwareGroups) {
-        const parsedSoftwareGroups = {};
-        for (const groupName in mergedSoftwareGroups) {
-            const group = mergedSoftwareGroups[groupName];
-            parsedSoftwareGroups[groupName] = {};
-            for (const softwareName in group) {
-                const softwareObject = group[softwareName];
-                if (softwareObject.basename && softwareObject.target) {
-                    parsedSoftwareGroups[groupName][softwareName] = softwareObject;
-                    const targetPath = softwareObject.target;
-                    if (fs.existsSync(targetPath)) {
-                        softwareObject.localFileExists = true;
-                    } else {
-                        softwareObject.localFileExists = false;
-                    }
-                }
-            }
-        }
-        return parsedSoftwareGroups;
-    }
 
     async installationRulesBefore(software, progressCallback, callback) {
         const appDir = software.appDir;
@@ -145,17 +120,19 @@ class Softinstall extends Base {
         //     if (callback) callback()
         //     return
         // }
+        let isBeforeRule = true
         if (mainDirLow.startsWith('avast')) {
             const links = [
-                [gdir.getUserProfileDir('AppData/Local/AVAST Software'), 'AVAST Software'],
-                ['C:/Program Files (x86)/AVAST Software', 'AVAST Software'],
+                [gdir.getUserProfileDir('AppData/Local/AVAST Software'), 'AVASTSoftware'],
+                ['C:/Program Files (x86)/AVAST Software', 'AVASTSoftware'],
             ]
-            this.linkToDirs(links, appDir, false)
+            console.log(`links`, links)
+            this.linkToDirs(links, appDir, true)
         } else if (mainDirLow.startsWith('discord')) {
             const links = [
                 [gdir.getUserProfileDir('AppData/Local/Discord'), 'Discord'],
             ]
-            this.linkToDirs(links, appDir, false)
+            this.linkToDirs(links, appDir, true)
         } else if (mainDirLow.startsWith('adobe')) {
             const links = [
                 ['C:/Program Files (x86)/Adobe', 'Adobe(x86)'],
@@ -167,12 +144,12 @@ class Softinstall extends Base {
             const links = [
                 ['C:/Program Files/BraveSoftware', 'BraveSoftware'],
             ]
-            this.linkToDirs(links, appDir, false)
+            this.linkToDirs(links, appDir, true)
         } else if (mainDirLow.startsWith('avg')) {
             const links = [
                 [gdir.getUserProfileDir('AppData/Local/AVG'), 'AVG'],
             ]
-            this.linkToDirs(links, appDir, false)
+            this.linkToDirs(links, appDir, true)
         } else if (mainDirLow.startsWith('google')) {
             const links = [
                 [gdir.getUserProfileDir('AppData/Local/Google'), 'Google'],
@@ -204,7 +181,21 @@ class Softinstall extends Base {
                 ['C:/ProgramData/Microsoft Visual Studio', 'MicrosoftVisualStudio_ProgramData']
             ]
             this.linkToDirs(links, appDir)
+        } else {
+            isBeforeRule = false
         }
+        if (isBeforeRule) {
+            software.addProgress(1, true)
+        }
+    }
+
+    installationRulesAfter(software) {
+
+    }
+
+    getShortcutTarget(shortcutPath) {
+        const result = execSync(`powershell -Command "(New-Object -ComObject WScript.Shell).CreateShortcut('${shortcutPath}').TargetPath"`).toString().trim();
+        return result;
     }
 
     linkToDirs(links, appDir, force = true) {
@@ -281,175 +272,207 @@ class Softinstall extends Base {
             return null;
         }
     }
-    async installSoftware(software, progressCallback, callback) {
+    async installByWingetId(software) {
+        const target = software.target;
+        const installDir = path.dirname(target);
+        file.mkdir(installDir);
+        const installCommand = [
+            'winget',
+            'install',
+            // `--ignore-security-hash`,
+            // `--ignore-local-archive-malware-scan`,
+            `--accept-source-agreements`,
+            `--accept-package-agreements`,
+            '--id',
+            software.winget_id,
+            '--location',
+            installDir,
+            `--disable-interactivity`,
+            '--silent',
+            '--force',
+        ];
+        console.log(`installCommand`, installCommand.join(' '))
+        const progressCallback = () => {
+            software.addProgress(80)
+        }
+        const stdOjb = await plattool.spawnAsync(installCommand, true, null, null, null, 50000, progressCallback)
+        software.done(stdOjb);
+        this.clearDesktopShortcuts(software)
+        return stdOjb
+    }
+
+    async installByDownloadBackupZip(software) {
+        const installDir = software.appDir;
+        const basename = software.basename;
+        const target = software.target;
+        const mainDir = file.getLevelPath(target, 2);
+        const applications = 'softlist/static_src/applications/';
+        let intervalProgress = 0;
+        const download = gdir.getCustomTempDir('Downloads');
+        const downloadProgressCallback = () => {
+            software.addProgress(30)
+        }
+        const zipProgressCallback = () => {
+            software.addProgress(99)
+        }
+        if (!fs.existsSync(target)) {
+            const softwareZipName = `${mainDir}.zip`
+            const downloadUrl = gdir.getLocalStaticApiUrl(`${applications}/${softwareZipName}`);
+            const destDir = path.join(download, softwareZipName);
+            const localFilePath = await httptool.downloadFile(downloadUrl, destDir, downloadProgressCallback);
+            if (localFilePath && localFilePath.dest) {
+                const dest = localFilePath.dest
+                const timer = setInterval(() => {
+                    if (intervalProgress < 99) {
+                        intervalProgress++;
+                        zipProgressCallback()
+                    } else {
+                        if (timer) clearInterval(timer);
+                    }
+                }, 1000);
+                zip.putUnZipTask(dest, installDir, () => {
+                    if (timer) clearInterval(timer);
+                    software.done()
+                }, zipProgressCallback);
+            } else {
+                software.fail(`Just the file download failed.`)
+            }
+        } else {
+            software.done()
+        }
+    }
+
+    async installByInstaller(software) {
         const installDir = software.appDir;
         const basename = software.basename;
         const target = software.target;
         const mainDir = file.getLevelPath(target, 2);
         const source_local = software.source_local;
-        const applications = 'softlist/static_src/applications/';
+        const source_internet = software.source_internet;
         const software_library = 'softlist/static_src/software_library/';
-        const installProgress = { value: 0 };
-        const download = gdir.getCustomTempDir('Downloads');
-        this.installationRulesBefore(software, progressCallback)
-
-        if (software.winget_id) {
-            const installCommand = `winget install --id ${software.winget_id} --location "${installDir}"`;
-            child_process.exec(installCommand);
-        } else if (software.install_type === 'installer') {
+        let downloadUrl = null
+        const downloadProgressCallback = () => {
+            software.addProgress(20)
+        }
+        const zipProgressCallback = () => {
+            software.addProgress(30)
+        }
+        if (source_local) {
+            downloadUrl = gdir.getLocalStaticApiUrl(`${software_library}/${source_local}`);
+        } else {
+            downloadUrl = source_internet
+        }
+        if (downloadUrl) {
+            const installBaseName = path.basename(downloadUrl);
+            const download = gdir.getCustomTempDir('Downloads');
             const installPath = path.join(installDir, basename);
-            let dest = path.join(download, software.source_local);
+            let dest = path.join(download, installBaseName);
             if (!fs.existsSync(installPath)) {
                 if (!fs.existsSync(dest)) {
                     const downloadUrl = this.getSoftwareDownloadUrl(software);
-                    dest = await httptool.downloadFile(downloadUrl, dest, (progress, readyDownload, downloading, message) => {
-                        this.installProgressProcess(progress, readyDownload, downloading, message, installProgress, progressCallback, callback)
-                    });
+                    dest = await httptool.downloadFile(downloadUrl, dest, downloadProgressCallback);
                 }
                 const unzipDir = path.join(download, path.basename(software.source_local, path.extname(software.source_local)));
 
-                const timer = setInterval(() => {
-                    if (installProgress.value < 99) {
-                        installProgress.value++;
-                        if (progressCallback) progressCallback(installProgress.value);
-                    } else {
-                        if (timer) clearInterval(timer);
-                        if (callback) callback();
-                        return
-                    }
-                }, 1000);
-
                 if (fs.existsSync(unzipDir)) {
-                    let installerExe = this.searchInstallerExe(unzipDir)
-                    await plattool.runAsAdmin(installerExe, (progress, message) => {
-                        if (callback) callback()
-                    });
-                    return
+                    await this.seartchInstallerAndRun(software, unzipDir)
+                } else {
+                    zip.putUnZipTask(dest, unzipDir, async () => {
+                        await this.seartchInstallerAndRun(software, unzipDir)
+                    }, zipProgressCallback);
                 }
-                zip.putUnZipTask(dest, unzipDir, async () => {
-                    if (progressCallback) progressCallback(100);
+            }
+        }else{
+            software.fail()
+        }
+    }
+
+    async seartchInstallerAndRun(software, unzipDir) {
+        if(software.startClickInstaller){
+            return 
+        }
+        if(!software.startClickInstaller){
+            software.startClickInstaller = true
+        }
+        let intervalProgress = 0;
+        const timerStart = () => {
+            const timer = setInterval(() => {
+                if (intervalProgress < 99) {
+                    intervalProgress++;
+                    software.addProgress(99)
+                } else {
+                    software.done()
                     if (timer) clearInterval(timer);
-                    // file.delete(dest)
-                    let installerExe = this.searchInstallerExe(unzipDir)
-                    await plattool.runAsAdmin(installerExe, (progress, message) => {
-                        if (callback) callback()
-                    });
-                    return
-                }, (progress) => {
-                    console.log(`progress`, progress)
-                });
-            }
-        } else if (software.source_local || typeof software.source_local === 'string') {
-            let installer = false
-            const destDir = path.join(download, software.source_local);
-            if (software.source_local === 'installer') {
-                installer = true
-            }
-            let zipDir = installer ? destDir : installDir;
-            if (!fs.existsSync(target)) {
-                const downloadUrl = gdir.getLocalStaticApiUrl(`${software_library}/${software.source_local}`);
-                const localFilePath = await httptool.downloadFile(downloadUrl, destDir, (progress, readyDownload, downloading, message) => {
-                    this.installProgressProcess(progress, readyDownload, downloading, message, installProgress, progressCallback, callback)
-                });
-                if (localFilePath && localFilePath.dest) {
-                    const dest = localFilePath.dest
-                    const timer = setInterval(() => {
-                        if (installProgress.value < 99) {
-                            installProgress.value++;
-                            if (progressCallback) progressCallback(installProgress.value);
-                        } else {
-                            if (timer) clearInterval(timer);
-                            if (callback) callback();
-                            return
-                        }
-                    }, 1000);
-
-                    if (file.isCompressedFile(dest)) {
-                        zip.putUnZipTask(dest, installDir, () => {
-                            if (progressCallback) progressCallback(100);
-                            if (timer) clearInterval(timer);
-                            file.delete(dest)
-                            if (callback) callback()
-                            return
-                        }, (progress) => {
-                            console.log(`progress`, progress)
-                        });
-                    } else {
-                        plattool.runAsAdmin(dest, (progress, message) => {
-                            if (progressCallback) progressCallback(100);
-                            if (timer) clearInterval(timer);
-                            if (callback) callback()
-                        })
-                    }
-                } else {
-                    const message = `Download and decompression errors.`
-                    console.log(message)
-                    if (progressCallback) progressCallback(-1, message)
-                    if (callback) callback()
-                    return
                 }
-            } else {
-                const message = `Software ${basename} is already installed in ${target}`
-                console.log(message)
-                if (progressCallback) progressCallback(100, message)
-                if (callback) callback()
-                return
-            }
+            }, 1000);
+        }
+        let installerExe = this.searchInstallerExe(unzipDir)
+        await plattool.runAsAdmin(installerExe, (progress, message) => {
+            timerStart()
+        });
+    }
 
+    async installSoftware(software) {
+        // const installDir = software.appDir;
+        // const basename = software.basename;
+        // const target = software.target;
+        // const mainDir = file.getLevelPath(target, 2);
+        // const source_local = software.source_local;
+        // const applications = 'softlist/static_src/applications/';
+        // const software_library = 'softlist/static_src/software_library/';
+        // const installProgress = { value: 0 };
+        // const download = gdir.getCustomTempDir('Downloads');
+        this.installationRulesBefore(software)
+        if (software.winget_id) {
+            await this.installByWingetId(software)
+        } else if (
+            software.install_type === 'installer'
+            ||
+            (software.source_local && typeof software.source_local === 'string')
+        ) {
+            await this.installByInstaller(software)
         } else if (software.install_type === '') {
-            if (!fs.existsSync(target)) {
-                const softwareZipName = `${mainDir}.zip`
-                const downloadUrl = gdir.getLocalStaticApiUrl(`${applications}/${softwareZipName}`);
-                const destDir = path.join(download, softwareZipName);
-                const localFilePath = await httptool.downloadFile(downloadUrl, destDir, (progress, readyDownload, downloading, message) => {
-                    if (progress == -1) {
-                        if (progressCallback) progressCallback(-1, message)
-                        if (callback) callback();
-                        return
-                    } else {
-                        installProgress.value = progress / 3
-                        if (progressCallback) progressCallback(installProgress.value)
-                    }
-                });
-                if (localFilePath && localFilePath.dest) {
-                    const dest = localFilePath.dest
-
-                    const timer = setInterval(() => {
-                        if (installProgress.value < 99) {
-                            installProgress.value++;
-                            if (progressCallback) progressCallback(installProgress.value);
-                        } else {
-                            if (timer) clearInterval(timer);
-                            if (callback) callback();
-                            return
-                        }
-                    }, 1000);
-                    zip.putUnZipTask(dest, installDir, () => {
-                        if (progressCallback) progressCallback(100);
-                        if (timer) clearInterval(timer);
-                        if (callback) callback()
-                        return
-                    }, (progress) => {
-                        console.log(`progress`, progress)
-                    });
-                } else {
-                    const message = `Download and decompression errors.`
-                    console.log(message)
-                    if (progressCallback) progressCallback(-1, message)
-                    file.delete(dest)
-                    if (callback) callback()
-                    return
-                }
-            } else {
-                const message = `Software ${basename} is already installed in ${target}`
-                console.log(message)
-                if (progressCallback) progressCallback(100, message)
-                if (callback) callback()
-                return
-            }
+            await this.installByDownloadBackupZip(software)
         } else {
             return { error: { code: 'UNSUPPORTED_INSTALL_METHOD', message: 'Unsupported installation method' } };
         }
+        this.installationRulesAfter()
+    }
+
+    deleteDesktopShortcuts(software) {
+        const desktopPath = path.join(require('os').homedir(), 'Desktop');
+        const shortcuts = fs.readdirSync(desktopPath).filter(file => file.endsWith('.lnk'));
+        shortcuts.forEach(async (shortcut) => {
+            const shortcutPath = path.join(desktopPath, shortcut);
+            const shortcutLinkInfo = await shoticon.parseLnkFile(shortcutPath);
+            const target = shortcutLinkInfo.target;
+            console.log(target, software.target)
+            if (fpath.equal(target, software.target)) {
+                file.delete(shortcutLinkInfo.linkPath)
+            }
+        });
+    }
+
+    clearDesktopShortcuts(software) {
+        const desktopPath = path.join(require('os').homedir(), 'Desktop');
+        const shortcuts = fs.readdirSync(desktopPath).filter(file => file.endsWith('.lnk'));
+        shortcuts.forEach(async (shortcut) => {
+            const shortcutPath = path.join(desktopPath, shortcut);
+            const shortcutLinkInfo = await shoticon.parseLnkFile(shortcutPath);
+            const target = shortcutLinkInfo.target;
+            if (fpath.equal(target, software.target)) {
+                file.delete(shortcutLinkInfo.linkPath)
+            }
+        });
+        setTimeout(() => {
+            this.deleteDesktopShortcuts(software)
+        }, 2000);
+        setTimeout(() => {
+            this.deleteDesktopShortcuts(software)
+        }, 3000);
+        setTimeout(() => {
+            this.deleteDesktopShortcuts(software)
+        }, 5000);
     }
 }
 

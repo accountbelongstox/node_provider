@@ -8,13 +8,15 @@ const net = require('net');
 const bodyParser = require('body-parser');
 const express = require('express');
 const expressWs = require('express-ws');
-const Base = require('../base/base');
+const Base = require('../base/base.js');
 const {
     gdir,
     env,
 } = require('../globalvars.js');
 let eggSocket = null, eggSocketServer = null
-const encyclopedia = require('../model/encyclopedia.js').getEncyclopedia();
+let {encyclopedia} = require('../globalvars.js');
+
+encyclopedia = encyclopedia.getEncyclopedia()
 
 let debug_send_event = false
 let debug_recieve_event = false
@@ -157,7 +159,6 @@ class Httptool extends Base {
     }
     downloadFile(url, dest, progressCallback) {
         let lastCallbackTime = 0;
-
         return new Promise((resolve, reject) => {
             if (!dest) {
                 dest = this.getDefaultDownloadFileDir(url);

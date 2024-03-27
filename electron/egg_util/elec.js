@@ -4,11 +4,81 @@ const os = require('os')
 const path = require('path');
 const { app, protocol } = require('electron');
 const { execSync, exec } = require('child_process');
-const { file, } = require('../utils');
-const log = require('../util/log');
+const { file, getnode, conf } = require('../../utils');
+const log = require('../../util/log');
+const { env, gdir } = require('../../globalvars');
+const Base = require('../../base/base');
 
-class ElectronInstance {
+class ElectronInstance extends Base {
+    constructor() {
+        super()
+    }
     userDataFile = 'userData.json';
+
+    preFrontendEnvironment(callback) {
+        const binConfig = conf.getAllAppBinConf()
+        const devConfig = binConfig.dev
+        const frontendConfig = devConfig.frontend
+        const frontendDirectory = devConfig.directory
+        const nodeByBinConfig = frontendConfig.node
+        getnode.getNpmByEnv(nodeByBinConfig).then(async (npmExec) => {
+            // npmExec = path.normalize(npmExec);
+            const defaultConfig = conf.getEggConfDir('bin.js');
+            const defaultConfigLines = file.readLines(defaultConfig)
+            const npmSuffix = `'${npmExec}',`
+            let npmOriginExe = ''
+            const searchString = 'npm';
+            for (let i = 0; i < defaultConfigLines.length; i++) {
+                const items = defaultConfigLines[i].split(':');
+                if (items.length > 1 && items[1].includes(searchString)) {
+                    npmOriginExe = items[1]
+                    items[1] = npmSuffix;
+                    defaultConfigLines[i] = items.join(':');
+                }
+            }
+            const modifiedContent = defaultConfigLines.join('\n');
+            file.saveFile(defaultConfig, modifiedContent);
+            this.success(`Desktop frontend NODE: ${nodeByBinConfig}`);
+            this.success(`Desktop frontend NPM: ${npmExec}`);
+            if (npmOriginExe) {
+                this.success(`\tIt has been modified: ${defaultConfig}`);
+                this.success(`\tModify part.: ${npmOriginExe} To ${npmSuffix}`);
+            }
+
+            const yarnExe = await getnode.getYarnByNodeVersion(nodeByBinConfig)
+
+            const desktop_by_node_frontend_file = gdir.getLocalInfoFile('.desktop_by_frontend_node.ini')
+            const desktop_by_npm_frontend_file = gdir.getLocalInfoFile('.desktop_by_frontend_npm.ini')
+            const desktop_by_yarn_frontend_file = gdir.getLocalInfoFile('.desktop_by_frontend_yarn.ini')
+            const desktop_by_node_frontenddir_file = gdir.getLocalInfoFile('.desktop_by_frontend_dir.ini')
+            file.saveFile(desktop_by_node_frontend_file,nodeByBinConfig)
+            file.saveFile(desktop_by_npm_frontend_file,path.normalize(npmExec))
+            file.saveFile(desktop_by_yarn_frontend_file,path.normalize(yarnExe))
+            file.saveFile(desktop_by_node_frontenddir_file,path.normalize(gdir.getRootDir(frontendDirectory)))
+            this.success( `File ${desktop_by_node_frontend_file} has been updated.`  )
+            this.success( `File ${desktop_by_npm_frontend_file} has been updated.`  )
+            this.success( `File ${desktop_by_yarn_frontend_file} has been updated.`  )
+            this.success(`The desktop front-end operating environment is ready.`)
+            if (callback) callback()
+        })
+    }
+
+    async getRunEnviromentInfo(callback){
+        const binConfig = conf.getAllAppBinConf()
+        const devConfig = binConfig.dev
+        const frontendConfig = devConfig.frontend
+        const nodeByBinConfig = frontendConfig.node
+        const npm_exe = await getnode.getNpmByEnv(nodeByBinConfig)
+        const yarnExe = await getnode.getYarnByNodeVersion(nodeByBinConfig)
+        const info =  {
+            nodeVersion: process.version,
+            frontendNodeVersion: nodeByBinConfig,
+            frontendNpm: npm_exe, 
+            frontendYarn: yarnExe, 
+        }
+        if(callback)callback(info)
+        return info
+    }
 
     getASARDir() {
         return app.getAppPath()

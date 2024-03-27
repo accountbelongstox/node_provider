@@ -247,7 +247,6 @@ class Win {
         })
     }
 
-    // 启用Hyper-V
     enableHyperV(callback) {
         exec('dism /online /enable-feature /featurename:Microsoft-Hyper-V /all', (error, stdout, stderr) => {
             if (error) {
@@ -265,7 +264,6 @@ class Win {
                 callback(error);
                 return;
             }
-
             if (isWSL2) {
                 console.log("WSL2 is already enabled. Trying to upgrade any WSL1 distributions.");
                 this.upgradeWSL1Distributions(callback);
@@ -277,11 +275,8 @@ class Win {
         });
     }
 
-
-
     checkVersionByTail(inputText, version) {
         const lines = inputText.split(/[\n\r]+/);
-        console.log(lines)
         for (let line of lines) {
             line = line.replaceAll(/\s+$/g, ``)
             if (line.endsWith(version)) {
@@ -301,11 +296,19 @@ class Win {
         })
     }
 
-    isWSL2Enabled(callback) {
-        tool.exec_cmd('wsl --status', (stdout, error) => {
-            const hasWSL2 = this.checkVersionByTail(stdout, `2`)
-            callback(hasWSL2, error);
-        })
+    async isWSL2Enabled(callback) {
+        const result = await plattool.execByCommand('wsl --status',)
+        const hasWSL2 = this.checkVersionByTail(result.stdout, `2`)
+        return hasWSL2
+    }
+
+    async installWsl2(){
+        let upCmd = `wsl --update`
+        let result = await plattool.execByCommand(upCmd)
+        console.log(result)
+        let setDefaultCmd = `wsl --set-default-version 2`
+         result = await plattool.execByCommand(setDefaultCmd)
+        console.log(result)
     }
 
     upgradeWSL1Distributions(callback) {
@@ -314,7 +317,6 @@ class Win {
                 callback(error);
                 return;
             }
-
             const wsl1Distributions = stdout.split('\n')
                 .filter(line => line.includes(' 1 '))
                 .map(line => line.trim().split(' ')[0]);

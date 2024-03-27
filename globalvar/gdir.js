@@ -12,6 +12,15 @@ class Gdir extends Base {
         super()
          
     }
+    getDesktopFile(param) {
+        const desktopPath = path.join(os.homedir(), 'Desktop');
+        
+        if (param) {
+            return path.join(desktopPath, param);
+        } else {
+            return desktopPath;
+        }
+    }
     getCustomTempDir(subDir) {
         const unixStylePath = __filename.split(/\\+/).join('/');
         const Driver = unixStylePath[0] + ":/"
@@ -193,10 +202,21 @@ class Gdir extends Base {
         return fullPath;
     }
     getLibraryDir(subDir) {
-        return this.getRelationRootDir(`library/${subDir || ''}`);
+        const platform = os.platform();
+        if (platform != 'win32') {
+            return this.getLibraryByLinuxDir(subDir);
+        } else  {
+            return this.getLibraryByWin32Dir(subDir);
+        }
+    }
+    getLibraryByLinuxDir(subDir) {
+        const fullPath = this.getRelationRootDir(`base/library/linux/${subDir || ''}`);
+        console.log(`fullPath`,fullPath)
+        return fullPath;
     }
     getLibraryByWin32Dir(subDir) {
-        const fullPath = this.getLibraryDir(`win32/${subDir || ''}`);
+        const fullPath = this.getRelationRootDir(`base/library/win32/${subDir || ''}`);
+        console.log(`fullPath`,fullPath)
         return fullPath;
     }
     getStaticFile(subDir) {

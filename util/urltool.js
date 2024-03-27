@@ -84,6 +84,12 @@ class UrlTool {
         return true
     }
     toOpenUrl(urlString) {
+        if(typeof urlString === 'object' && urlString.protocol && urlString.hostname && urlString.port){
+            const protocol = urlString.protocol
+            const hostname = urlString.hostname
+            const port = urlString.port
+            urlString = `${protocol}${hostname}:${port}`
+        }
         const parsedUrl = new URL(urlString);
         const protocol = parsedUrl.protocol;
         let hostname = parsedUrl.hostname;

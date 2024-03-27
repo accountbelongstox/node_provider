@@ -2,14 +2,14 @@ const path = require('path');
 // const { exec } = require('child_process');
 const fs = require('fs');
 const Base = require('../base/base');
-const { getnode,porttool } = require('../../node_provider/utils.js');
 // const appRoot = path.resolve(app.getAppPath());
 // const mainServer = conf.getValue('mainServer')
 // const indexDir = "." + path.dirname(mainServer.indexPath)
 // const distDir = path.join(appRoot, indexDir)
 const http = require('http');
 const { env } = require('../globalvars.js');
-const { strtool, urltool, file, plattool, setenv } = require('../utils.js');
+const { strtool, urltool, file, plattool, getnode,porttool } = require('../utils.js');
+const { type } = require('os');
 let electronShell = null
 
 class Serve extends Base {
@@ -138,6 +138,12 @@ class Serve extends Base {
     }
 
     openFrontendServerUrl(openUrl) {
+        if(typeof openUrl === 'object' && openUrl.protocol && openUrl.hostname && openUrl.port){
+            const protocol = openUrl.protocol
+            const hostname = openUrl.hostname
+            const port = openUrl.port
+            openUrl = `${protocol}${hostname}:${port}`
+        }
         if (!openUrl) openUrl = this.getFrontendServerUrl()
         openUrl = urltool.toOpenUrl(openUrl)
         try{

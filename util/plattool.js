@@ -118,9 +118,11 @@ class Plattools extends Base {
     }
 
     wrapEmdResult(success = true, stdout = '', error = null, code = 0, info = true) {
+        stdout = this.byteToStr(stdout)
+        error = this.byteToStr(stdout)
         if (info) {
-            this.info(this.byteToStr(stdout))
-            this.warn(this.byteToStr(error))
+            this.info(stdout)
+            this.warn(error)
         }
         return {
             success,
@@ -169,10 +171,12 @@ class Plattools extends Base {
         return resultText;
     }
 
-    async spawnAsync(command, info = true, cwd = null, logname = null, callback, timeout = 5000) {
+    async spawnAsync(command, info = true, cwd = null, logname = null, callback, timeout = 5000,progressCallback=null) {
         let cmd = '';
         let args = [];
-        command = command.split(/\s+/)
+        if(typeof command === 'string'){
+            command = command.split(/\s+/)
+        }
         if (Array.isArray(command)) {
             cmd = command[0];
             args = command.slice(1);
@@ -220,6 +224,8 @@ class Plattools extends Base {
                     this.easyLog(output, logname);
                 }
                 stdoutData += output + '\n';
+                // console.log(`stdout.on`,progressCallback)
+                progressCallback && progressCallback(stdoutData)
             });
             childProcess.stderr.on('data', (data) => {
                 resetTimer();
@@ -228,9 +234,9 @@ class Plattools extends Base {
                     this.warn(error);
                 }
                 stderrData += error + '\n';
+                progressCallback && progressCallback(stdoutData)
             });
             childProcess.on('close', (code) => {
-                console.log(`childProcess-close`)
                 process.chdir(this.initialWorkingDirectory);
                 if (logname) {
                     this.easyLog(stdoutData, logname);
@@ -247,7 +253,6 @@ class Plattools extends Base {
                 }
             });
             childProcess.on('error', (err) => {
-                console.log(`childProcess-error`)
                 process.chdir(this.initialWorkingDirectory);
                 resolve(
                     this.wrapEmdResult(false,

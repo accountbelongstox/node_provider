@@ -46,7 +46,14 @@ class Env extends Base {
         return null;
     }
 
-    static load(rootDir, envName = '.env', delimiter = '=') {
+    //loadDir
+    load(rootDir, envName = '.env', delimiter = '=') {
+        return new Env(rootDir, envName, delimiter);
+    }
+
+    loadFile(envFilePath, delimiter = '=') {
+        const rootDir = path.dirname(envFilePath);
+        const envName = path.basename(envFilePath);
         return new Env(rootDir, envName, delimiter);
     }
 

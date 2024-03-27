@@ -1,59 +1,140 @@
-'use strict';
 const { exec, execSync } = require('child_process');
+const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
-const { file, str, platform } = require('../utils');
+const Base = require('../../base/base');
+const os = require('os');
+const crypto = require('crypto');
+const { gdir } = require('../../globalvars');
 
-class Zip {
+class ZipTask extends Base {
     callbacks = {}
     maxTasks = 10;
     pendingTasks = [];
     concurrentTasks = 0;
     execCountTasks = 0
     execTaskEvent = null
-    zipExecPath = null;
     zipQueueTokens = []
 
-    setMode(mode) { // update | delete
-        //The model here is either an upgrade or an override. If not set, it will not be processed when the file exists.
+    constructor() {
+        super()
+    }
+
+    get_md5(value) {
+        const hash = crypto.createHash('md5');
+        hash.update(value);
+        return hash.digest('hex');
+    }
+
+    createString(length = 10) {
+        const letters = 'abcdefghijklmnopqrstuvwxyz';
+        let result = '';
+        for (let i = 0; i < length; i++) {
+            result += letters.charAt(Math.floor(Math.random() * letters.length));
+        }
+        return result;
+    }
+
+    create_id(value) {
+        if (!value) value = this.createString(128)
+        const _id = this.get_id(value);
+        return _id;
+    }
+
+    get_id(value, pre) {
+        value = `` + value
+        const md5 = this.get_md5(value);
+        let _id = `id${md5}`
+        if (pre) _id = pre + _id
+        return _id;
+    }
+
+    getCurrentOS() {
+        return os.platform();
+    }
+
+    isWindows() {
+        return this.getCurrentOS() === 'win32';
+    }
+
+    get7zExeName() {
+        let exeFile = `7zz`
+        if (this.isWindows()) {
+            exeFile = `7z.exe`
+        }
+        return exeFile
+    }
+
+    get7zExe() {
+        // let folder = `linux`
+        let exeFile = this.get7zExeName()
+        // if (this.isWindows()) {
+        //     folder = `win32`
+        // }
+        const libraryDir = gdir.getLibraryDir();
+        return path.join(libraryDir, exeFile)
+    }
+
+    mkdirSync(directoryPath) {
+        return this.mkdir(directoryPath)
+    }
+
+    mkdir(dirPath) {
+        if (!fs.existsSync(dirPath)) {
+            fs.mkdirSync(dirPath, { recursive: true });
+        }
+    }
+
+    isFileLocked(filePath) {
+        if (!fs.existsSync(filePath)) {
+            return false
+        }
+        try {
+            const fd = fs.openSync(filePath, 'r+');
+            fs.closeSync(fd);
+            return false;
+        } catch (error) {
+            if (error.code === 'EBUSY' || error.code === 'EPERM') {
+                return true;
+            }
+            return false
+        }
+    }
+
+    getModificationTime(fp) {
+        if (!this.existsSync(fp)) {
+            return 0
+        }
+        try {
+            const stats = fs.statSync(fp);
+            return stats.mtime.getTime();
+        } catch (error) {
+            console.error(`Error getting modification time: ${error.message}`);
+            return 0;
+        }
+    }
+
+    getFileSize(filePath) {
+        if (!this.existsSync(filePath)) {
+            return -1
+        }
+        try {
+            const stats = fs.statSync(filePath);
+            const fileSizeInBytes = stats.size;
+            return fileSizeInBytes;
+        } catch (error) {
+            return -1;
+        }
+    }
+
+    setMode(mode) {
         this.mode = mode
     }
 
     log(msg, event) {
-        console.log(msg)
-    }
-
-    getZipExecPath() {
-        if (!this.zipExecPath) {
-            const binDir = file.findFileUpward('bin', path.dirname(__dirname));
-            const platform = os.platform();
-
-            if (platform === 'win32') {
-                this.zipExecPath = path.join(binDir, '7z.exe');
-            } else if (platform === 'linux') {
-                try {
-                    const { stdout } = execSync('which 7z');
-                    const foundPath = stdout.trim();
-                    if (foundPath) {
-                        this.zipExecPath = foundPath;
-                    } else {
-                        console.error('Error: 7z executable not found.');
-                        console.error('Please make sure it is installed or provide the correct path.');
-                        console.error('Suggested installation command: sudo apt-get install p7zip-full');
-                    }
-                } catch (error) {
-                    console.error('Error executing "which" command:', error.message);
-                }
-            } else {
-                console.error('Unsupported platform: ' + platform);
-                return;
-            }
-            if (!file.isFileAsync(this.zipExecPath)) {
-                console.error('Error: 7z executable not found at ' + this.zipExecPath);
-                console.error('Please make sure it is installed or provide the correct path.');
-            }
+        if (event) {
+            this.success(msg)
         }
-        return this.zipExecPath;
     }
 
     async compressDirectory(srcDir, outDir, token, callback) {
@@ -63,7 +144,7 @@ class Zip {
             return;
         }
         if (!fs.existsSync(outAbsPath)) {
-            file.mkdirSync(outAbsPath)
+            this.mkdirSync(outAbsPath)
         }
         const subDirectories = fs.readdirSync(srcAbsPath, { withFileTypes: true }).filter(entry => entry.isDirectory());
         for (const subDir of subDirectories) {
@@ -83,37 +164,92 @@ class Zip {
         return zipFilePath
     }
 
-    async addToPendingTasks(command, callback) {
+    async addToPendingTasks(command, callback, processCallback) {
         this.concurrentTasks++;
-        let startTime = new Date();
-        exec(command, (error, stdout, stderr) => {
-            if (error) {
-                this.log(`Error compressing: ${error.message}`);
-            } else if (stdout) {
-                this.log(`StdError compressing: ${stderr.toString()}`);
-            }
-            if (callback) callback(new Date() - startTime)
+        this.execBySpawn(command, callback, processCallback);
+    }
+
+    execBySpawn(command, callback, processCallback) {
+        const startTime = new Date();
+        const child = spawn(command, { shell: true });
+
+        child.stdout.on('data', (data) => {
+            data = this.byteToStr(data)
+            if (processCallback) processCallback(data);
         });
+
+        child.stderr.on('data', (data) => {
+            data = this.byteToStr(data)
+            console.error(`Error: ${data}`);
+            if (processCallback) processCallback(-1);
+        });
+
+        child.on('close', (code) => {
+            console.log(`child process exited with code ${code}`);
+            if (callback) callback(new Date() - startTime);
+        });
+    }
+
+    byteToStr(astr) {
+        try {
+            astr = astr.toString('utf-8');
+            return astr;
+        } catch (e) {
+            astr = String(astr);
+            const isByte = /^b\'{0,1}/;
+            if (isByte.test(astr)) {
+                astr = astr.replace(/^b\'{0,1}/, '').replace(/\'{0,1}$/, '');
+            }
+            return astr;
+        }
+    }
+
+    processesCount(processName) {
+        const normalizedProcessName = processName.toLowerCase();
+        let cmd;
+
+        if (this.isWindows()) {
+            cmd = `tasklist /fi "imagename eq ${processName}`;
+        } else {
+            cmd = `ps aux | grep ${processName}`;
+        }
+        try {
+            const stdout = execSync(cmd, { encoding: 'utf8' });
+            const count = stdout.split('\n').filter(line => line.toLowerCase().includes(normalizedProcessName)).length - 1;
+            return count;
+        } catch (err) {
+            console.error('Error executing command:', err);
+            return 10000;
+        }
+    }
+
+    a7zProcessesCount() {
+        const processName = this.get7zExeName()
+        let processZipCount = this.processesCount(processName)
+        return processZipCount
     }
 
     async execTask() {
         if (!this.execTaskEvent) {
             this.log(`Background compaction task started`, true);
             this.execTaskEvent = setInterval(() => {
-                let processZipCount = platform.processesCount(`7z.exe`)
+                let processZipCount = this.a7zProcessesCount()
                 if (processZipCount != 10000) {
                     this.concurrentTasks = processZipCount
                 }
                 if (this.concurrentTasks >= this.maxTasks) {
                     this.log(`7zProcesse tasks is full. current tasks:${this.concurrentTasks}, waiting...`);
                 } else if (this.pendingTasks.length > 0) {
+
                     const TaskObject = this.pendingTasks.shift();
                     const command = TaskObject.command
                     const isQueue = TaskObject.isQueue
                     const token = TaskObject.token
+                    const processCallback = TaskObject.processCallback
+
                     let zipPath = TaskObject.zipPath
                     let zipName = path.basename(zipPath)
-                    if (!file.isFileLocked(zipPath)) {
+                    if (!this.isFileLocked(zipPath)) {
                         this.log(`Unziping ${zipName}, background:${this.concurrentTasks}`, true);
                         this.execCountTasks++
                         this.addToPendingTasks(command, (usetime) => {
@@ -125,7 +261,7 @@ class Zip {
                             if (!isQueue) {
                                 this.execTaskCallback(token)
                             }
-                        })
+                        },processCallback)
                     } else {
                         this.pendingTasks.push(TaskObject);
                         this.log(`The file is in use, try again later, "${zipPath}"`)
@@ -168,18 +304,18 @@ class Zip {
         this.putTask(src, out, token, true, callback)
     }
 
-    putUnZipTask(src, out, callback) {
-        let token = str.get_id(src)
-        this.putTask(src, out, token, false, callback, false)
+    putUnZipTask(src, out, callback,processCallback) {
+        let token = this.get_id(src)
+        this.putTask(src, out, token, false, callback, false,processCallback)
     }
-    putUnZipQueueTask(src, out, callback) {
-        let token = str.get_id(src)
-        this.putTask(src, out, token, false, callback)
+    putUnZipQueueTask(src, out, callback,processCallback) {
+        let token = this.get_id(src)
+        this.putTask(src, out, token, false, callback,true,processCallback)
     }
 
     putQueueCallback(callback, token) {
         if (callback && !this.callbacks[token]) {
-            if (!token) token = str.create_id()
+            if (!token) token = this.create_id()
             this.zipQueueTokens.push(token)
             this.callbacks[token] = {
                 callback,
@@ -189,7 +325,19 @@ class Zip {
         }
     }
 
-    putTask(src, out, token, isZip = true, callback, isQueue = true) {
+    async putUnZipTaskPromise(zipFilePath, targetDirectory) {
+        return new Promise((resolve, reject) => {
+            this.putUnZipTask(zipFilePath, targetDirectory, (error) => {
+                if (error) {
+                    reject(error);
+                } else {
+                    resolve();
+                }
+            });
+        }).catch((error) => { });
+    }
+
+    putTask(src, out, token, isZip = true, callback, isQueue = true,processCallback) {
         if (callback && !this.callbacks[token]) {
             this.callbacks[token] = {
                 callback,
@@ -204,33 +352,34 @@ class Zip {
         let command
         if (isZip) {
             zipPath = this.getZipPath(src, out)
-            if (file.existsSync(zipPath)) {
+            if (fs.existsSync(zipPath)) {
                 if (!this.mode) {
                     return
                 }
                 if (this.mode.update) {
-                    let srcModiTime = file.getModificationTime(src)
-                    let zipPathModiTime = file.getModificationTime(zipPath)
+                    let srcModiTime = this.getModificationTime(src)
+                    let zipPathModiTime = this.getModificationTime(zipPath)
                     let difTime = srcModiTime - zipPathModiTime
                     if (difTime < 1000 * 60) {
                         return
                     }
-                    file.delete(zipPath)
+                    fs.unlinkSync(zipPath)
                 } else if (this.mode.override) {
-                    file.delete(zipPath)
+                    fs.unlinkSync(zipPath)
                 } else {
                     return
                 }
             }
-            let zipSize = file.getFileSize(zipPath)
+            let zipSize = this.getFileSize(zipPath)
             if (zipSize == 0) {
-                file.delete(zipSize)
+                fs.unlinkSync(zipSize)
             }
             command = this.createZipCommand(src, out)
         } else {
             zipPath = src
             command = this.createUnzipCommand(src, out)
         }
+
         if (!this.isTask(zipPath)) {
             let zipAct = isZip ? `compression` : `unzip`
             let zipName = path.basename(zipPath)
@@ -239,7 +388,8 @@ class Zip {
                 command,
                 zipPath,
                 token,
-                isQueue
+                isQueue,
+                processCallback
             })
         }
         this.execTask()
@@ -260,19 +410,18 @@ class Zip {
         const srcDirName = path.basename(srcDir);
         const zipFileName = `${srcDirName}.zip`;
         const zipFilePath = path.join(outDir, zipFileName);
-        const command = `"${this.getZipExecPath()}" a "${zipFilePath}" "${srcDir}"`;
+        const command = `"${this.get7zExe()}" a "${zipFilePath}" "${srcDir}"`;
         return command
     }
 
     createUnzipCommand(zipFilePath, destinationPath) {
-        const command = `${this.getZipExecPath()} x "${zipFilePath}" -o"${destinationPath}" -y`;
+        const command = `${this.get7zExe()} x "${zipFilePath}" -o"${destinationPath}" -y`;
         return command;
     }
 
     test(archivePath) {
         try {
-            execSync(`${this.getZipExecPath()} t "${archivePath}"`, { stdio: 'pipe' });
-            // 如果命令执行成功，说明压缩文件完好无损
+            execSync(`${this.get7zExe()} t "${archivePath}"`, { stdio: 'pipe' });
             return true;
         } catch (error) {
             console.error("Error testing the archive:", error);
@@ -281,5 +430,5 @@ class Zip {
     }
 }
 
-Zip.toString = () => '[class Zip]';
-module.exports = new Zip();
+ZipTask.toString = () => '[class ZipTask]';
+module.exports = new ZipTask();

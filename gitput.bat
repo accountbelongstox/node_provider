@@ -9,9 +9,11 @@ set "hour=%datetime:~8,2%"
 set "minute=%datetime:~10,2%"
 set "second=%datetime:~12,2%"
 set "timestamp=%year%-%month%-%day% %hour%:%minute%:%second%"
+
+
 REM git
 git add .
 git commit -m "%timestamp%"
 git push --set-upstream origin master
+
 endlocal
-        

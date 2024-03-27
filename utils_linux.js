@@ -12,11 +12,10 @@ const math_ = require('./util/math.js');
 const conf = require('./util/conf.js');
 const log = require('./util/log.js');
 const winston = require('winston');
-const plattool = require('./util/plattool');
-const sysarg = require('./util/sysarg');
-const env = require('./util/env.js');
+const plattool = require('./util/plattool.js');
+const sysarg = require('./util/sysarg.js');
 const getnode = require('./util/getnode.js');
-const zip = require('./util/zip.js');
+const zip = require('./util/ziptask.js');
 const porttool = require('./util/porttool.js');
 const httptool = require('./util/httptool.js');
 
@@ -37,7 +36,6 @@ module.exports = {
     plattool,
     log,
     sysarg,
-    env,
     zip,
     getnode,
     porttool,

@@ -8,14 +8,15 @@ const net = require('net');
 const bodyParser = require('body-parser');
 const express = require('express');
 const expressWs = require('express-ws');
-const { porttool,env } = require('../../node_provider/utils.js');
+const { porttool,env } = require('../utils.js');
 const {
     file,
     strtool,
     tool,
     urltool
 } = require('../utils.js');
-const encyclopedia = require('../model/encyclopedia.js').getEncyclopedia();
+let {encyclopedia} = require('../globalvars.js');
+encyclopedia = encyclopedia.getEncyclopedia()
 
 let debug_send_event = false
 let debug_recieve_event = false

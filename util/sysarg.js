@@ -12,7 +12,7 @@ class SysArg {
     getPlatform() {
         return this.platform;
     }
-
+    
     getArg(name) {
         if (typeof name === 'number') {
             name = name + 1;

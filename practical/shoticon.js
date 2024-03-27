@@ -2,30 +2,19 @@ const path = require('path');
 const fs = require('fs');
 const electron = require('electron');
 const util = require('util');
-const readdirPromise = util.promisify(fs.readdir);
-const statPromise = util.promisify(fs.stat);
 const winShortcut = require('windows-shortcuts');
 const { atob } = require('atob');
 const { file, strtool, httptool, tool } = require('../utils.js');
 const { gdir, env } = require('../globalvars.js');
-const { Console } = require('console');
 let pngImgToIco;
 const config = {}
 const ShortcutQureyAsync = util.promisify(winShortcut.query);
 const ShortcutEditAsync = util.promisify(winShortcut.edit);
 const ShortcutCreateAsync = util.promisify(winShortcut.create);
-const { nativeImage, app,screen } = electron;
+const { nativeImage, app, screen } = electron;
 
 class Main {
-    iconCache = {};
-    baseIconsConfigKeys = [
-        "winget_id",
-        "source_internet",
-        "source_local",
-        "source_winget",
-        "installation_method",
-    ]
-    localIconCache = null
+    iconParseLnkCache = {};
     iconTmpDir = gdir.getLocalDir()
     converToError = []
     converToErrorImgs = []
@@ -33,31 +22,41 @@ class Main {
     constructor() {
     }
 
+    async parseLnkFile(lnkFilePath) {
+        if(!file.isAbsolute(lnkFilePath)){
+            lnkFilePath = gdir.getDesktopFile(lnkFilePath)
+        }
+        
+        const basename = path.basename(lnkFilePath);
+        if (this.iconParseLnkCache[basename]) {
+            return this.iconParseLnkCache[basename];
+        }
+
+        try {
+            const shortcutData = await ShortcutQureyAsync(lnkFilePath);
+            shortcutData.linkPath = lnkFilePath;
+            this.iconParseLnkCache[basename] = shortcutData;
+            return shortcutData;
+        } catch (error) {
+            console.error(`Error reading shortcut ${lnkFilePath}:`, error);
+            return null;
+        }
+    }
+
     getIconWidth() {
         let icon_width = parseInt(env.getEnv('DESKTOP_ICON_WIDTH', 50));
-        try{
+        try {
             const primaryDisplay = screen.getPrimaryDisplay();
             const { width, height } = primaryDisplay.workAreaSize;
-            if(width <= 1920){
+            if (width <= 1920) {
                 icon_width = 30
             }
             env.setEnv('DESKTOP_ICON_WIDTH', icon_width)
-        }catch(e){
+        } catch (e) {
             console.log(e)
         }
         return icon_width
 
-    }
-
-    getShortcutIconList() {
-        let shortcutIconList = file.readDirectory(this.iconTmpDir)
-        return shortcutIconList
-    }
-
-    getShortcutIconListTotal() {
-        let shortcutIconList = this.getShortcutIconList()
-        let totalLength = Object.values(shortcutIconList).reduce((acc, val) => acc + val.length, 0);
-        return totalLength
     }
 
     async generateIconShortcut(icons) {
@@ -106,155 +105,6 @@ class Main {
         if (create_icons > 0) {
 
             messageWidget.success(`Successfully created icon: ${create_icons}.`)
-        }
-    }
-
-    async scanIconsDir() {
-        let icon_dir = this.iconTmpDir
-        let iconsDirJSON = {};
-        const subDirs = await readdirPromise(icon_dir);
-        for (let subdir of subDirs) {
-            const fullPath = path.join(icon_dir, subdir);
-            const stats = await statPromise(fullPath);
-            if (stats.isDirectory()) {
-                const files = await readdirPromise(fullPath);
-                iconsDirJSON[subdir] = files.filter(f => !f.startsWith('.')).reduce((acc, filename) => {
-                    acc[filename] = null;
-                    return acc;
-                }, {});
-            }
-        }
-        return iconsDirJSON;
-    }
-
-    updatePathsInIconCachejson(obj) {
-        let includes = [`c`]
-        let newPath = config.soft_localpath
-        for (let key in obj) {
-            if (key === 'path' || key === 'target' || key === 'iconPath') {
-                if (key) {
-                    let oldPath = obj[key]
-                    let drive = file.getDrive(oldPath)
-                    if (!includes.includes(drive) && drive) {
-                        obj[key] = file.replacePathByLevel(oldPath, 2, newPath);
-                    }
-                }
-            }
-        }
-        return obj;
-    }
-
-    mergeIconCache(iconLocal, iconsRemoteJSON) {
-        for (const key in iconsRemoteJSON) {
-            if (!iconLocal[key]) {
-                iconLocal[key] = iconsRemoteJSON[key];
-            }
-            for (const key2 in iconsRemoteJSON[key]) {
-                if (!iconLocal[key][key2]) {
-                    iconLocal[key][key2] = iconsRemoteJSON[key][key2]
-                }
-                for (const key3 in iconsRemoteJSON[key][key2]) {
-                    if (!iconLocal[key][key2][key3]) {
-                        iconLocal[key][key2][key3] = iconsRemoteJSON[key][key2][key3]
-                    }
-                }
-            }
-        }
-        iconLocal = this.updatePathsInIconCachejson(iconLocal)
-        return iconLocal
-    }
-
-    async getNoIconGenerated(localIconCache, iconsDirJSON) {
-        let NoIconGenerated = {};
-        for (let subdir in iconsDirJSON) {
-            if (!localIconCache[subdir]) {
-                console.log(localIconCache[subdir])
-                NoIconGenerated[subdir] = iconsDirJSON[subdir];
-            } else {
-                for (let filename in iconsDirJSON[subdir]) {
-                    if (!localIconCache[subdir][filename]) {
-                        if (!NoIconGenerated[subdir]) {
-                            NoIconGenerated[subdir] = {};
-                        }
-                        console.log(subdir, filename)
-                        NoIconGenerated[subdir][filename] = iconsDirJSON[subdir][filename];
-                    }
-                }
-            }
-        }
-        return NoIconGenerated;
-    }
-
-    countSubElement(jsonObj) {
-        let count = 0;
-        for (let key in jsonObj) {
-            let value = jsonObj[key];
-            if (typeof value === 'object' && value !== null) {
-                for (let subKey in value) {
-                    count++;
-                }
-            }
-        }
-        return count;
-    }
-
-    async iconsDirUpToCacheJSON(localIconCache) {
-        if (!localIconCache) localIconCache = this.readIconJSONCacheByLocal()
-        const iconsDirJSON = await this.scanIconsDir();
-        let updateJSON = await this.getNoIconGenerated(localIconCache, iconsDirJSON)
-        if (Object.keys(updateJSON).length) {
-            let countSubElement = this.countSubElement(updateJSON)
-            let shortcutsIcon = this.readShortcutsIconJSONByLocal()
-            for (let gname in updateJSON) {
-                let gConf = updateJSON[gname]
-                if (!localIconCache[gname]) {
-                    localIconCache[gname] = {}
-                }
-                for (let softname in gConf) {
-                    let gDir = path.join(this.iconTmpDir, gname)
-                    let lnkPath = path.join(gDir, softname)
-                    let basename = path.basename(softname, '.lnk')
-                    this.readLinkFile(lnkPath, (result) => {
-                        let softConf = {
-                            path: result.target,
-                            target: result.target,
-                            listcount: Object.keys(gConf).length,
-                            iconPath: result.expanded.icon,
-                            basename,
-                            winget_id: "",
-                            isExist: file.isFile(result.target),
-                            source_internet: "",
-                            source_local: "",
-                            source_winget: "",
-                            installation_method: "",
-                            default_icon: "",
-                            default_install_dir: "",
-                            install_type: "",
-                            is_local: true
-                        }
-                        localIconCache[gname][softname] = softConf
-                        countSubElement--
-                        if (countSubElement == 0) {
-                            console.log(localIconCache)
-                            this.saveIconJSONByLocal(localIconCache)
-                        }
-                        if (!shortcutsIcon[basename]) {
-                            this.readFileAsBase64(softConf.iconPath, (iconBase64) => {
-                                this.updateIconToHTML(gname, softConf, iconBase64)
-                                shortcutsIcon[basename] = {
-                                    basename,
-                                    iconBase64
-                                }
-                                let jsonFile = this.getShortcutsIconFName()
-                                file.saveJSON(jsonFile, shortcutsIcon)
-                            })
-                        } else {
-                            let iconBase64 = shortcutsIcon[basename].iconBase64
-                            this.updateIconToHTML(gname, softConf, iconBase64)
-                        }
-                    })
-                }
-            }
         }
     }
 
@@ -330,68 +180,6 @@ class Main {
         let aid = this.genAid(basename)
         return `img${aid}`
     }
-
-    async readIcons() {
-        let localIconCache = this.readIconJSONByLocal()
-        if (Object.keys(localIconCache).length === 0) {
-            localIconCache = await this.MergeRemoteIconFiles()
-        }
-        localIconCache = this.checkIconFileIsExists(localIconCache)
-        this.generateIconShortcut(localIconCache)
-        if (!this.seticonsDirUpToCacheJSON) {
-            this.seticonsDirUpToCacheJSON = setInterval(() => {
-                console.log(`check new icons`)
-                this.iconsDirUpToCacheJSON(localIconCache)
-            }, 180000)
-        }
-
-        localIconCache = this.createIdByIconsJSON(localIconCache)
-        this.localIconCache = localIconCache
-        return localIconCache
-    }
-
-    async readIconsCache() {
-        if (this.localIconCache) {
-            return this.localIconCache
-        }
-        return await this.readIcons()
-    }
-
-    async MergeRemoteIconFiles() {
-        let iconLocal = this.readIconJSONByLocal()
-        let remoteConfigFile = `icons_config/${config.remote_soft_icon_conf}`
-
-        let iconShortcuts = `icons_config/${this.getRemoteShortcutsIconFile()}`
-        let softJsonUrl = `icons_config/softs.json`
-
-        let remote_update_url = config.setting_soft_remote_update_url
-        let iconsRemoteJSON = {}
-        let iconsShortcutsJSON = {}
-        let softJson = {}
-        if (remote_update_url.startsWith('\\\\')) {
-            iconsRemoteJSON = file.openNetworkJSON(remote_update_url, remoteConfigFile)
-            iconsShortcutsJSON = file.openNetworkJSON(remote_update_url, iconShortcuts)
-        } else if (remote_update_url.startsWith('http://') || remote_update_url.startsWith('https://')) {
-            let remoteConfigFileUrl = httptool.joinURL(remote_update_url, remoteConfigFile)
-            console.log(`MergeRemoteIconFiles ${remoteConfigFileUrl}`)
-            iconsRemoteJSON = await httptool.getJSON(remoteConfigFileUrl);
-            let remoteIconShortcuts = httptool.joinURL(remote_update_url, iconShortcuts)
-            console.log(`MergeRemoteIconFiles ${remoteIconShortcuts}`)
-            iconsShortcutsJSON = await httptool.getJSON(remoteIconShortcuts);
-            softJson = await httptool.getJSON(httptool.joinURL(remote_update_url, softJsonUrl));
-        } else if (remote_update_url.startsWith('ftp://')) {
-            return iconLocal;
-        } else {
-            return iconLocal;
-        }
-        iconLocal = this.mergeIconCache(iconLocal, iconsRemoteJSON)
-        this.saveIconJSONByLocal(iconLocal)
-        file.saveJSON(this.getShortcutsIconFile(), iconsShortcutsJSON)
-        file.saveJSON(gdir.getLocalDir(`softs.json`), softJson)
-        iconLocal = this.mergeIconShort(iconLocal, iconsShortcutsJSON)
-        return iconLocal
-    }
-
 
     getDefaultImageBase64Icon() {
         if (this.defaultImageBase64IconTemp) {
@@ -581,7 +369,7 @@ class Main {
     }
     hasGroupName(groupname, groupnames, jsonData) {
         if (!groupnames) groupnames = this.getGroupNames(jsonData)
-        if (groupnames.includes(groupname) ) {
+        if (groupnames.includes(groupname)) {
             return true
         }
         return false
@@ -597,7 +385,7 @@ class Main {
     }
     hasSoftByGroup(basename, softs, groupname, jsonData) {
         if (!softs) softs = this.getSoftNamesByGroup(groupname, jsonData)
-        if ( softs.includes(basename)) {
+        if (softs.includes(basename)) {
             return true
         }
         return false
@@ -636,7 +424,6 @@ class Main {
         }
         return false
     }
-
     mergeIconShort(iconsJson, shortcutsIcon) {
         let base64Img = `iconBase64`
         for (const key in iconsJson) {
@@ -651,11 +438,6 @@ class Main {
         }
         return iconsJson
     }
-
-    async generateIconJson() {
-        const iconJson = await this.getShortcutIcon(this.iconTmpDir);
-    }
-
     async updateShortcut(group, basename, target, icon, base64image) {
         let icon_dir = path.join(this.iconTmpDir, group);
         let icon_basename
@@ -754,6 +536,7 @@ class Main {
             }
         });
     }
+
     base64ToICO(base64String, outputFilePath) {
         const binaryData = atob(base64String);
         file.mkbasedir(outputFilePath)
@@ -765,8 +548,8 @@ class Main {
             pngImgToIco = require('png-to-ico');
         }
         const baseImgPath = path.basename(pngFilePath)
-        if(this.converToErrorImgs.includes(baseImgPath)){
-            return 
+        if (this.converToErrorImgs.includes(baseImgPath)) {
+            return
         }
         pngImgToIco(pngFilePath)
             .then(buf => {
@@ -791,6 +574,7 @@ class Main {
         const binaryData = Buffer.from(base64Data, 'base64');
         fs.writeFileSync(outputFilePath, binaryData);
     }
+
     createIconFile(jsonData) {
         let iconsCacheDir = gdir.getLocalDir(`iconsCache`)
         for (let index = 0; index < jsonData.length; index++) {
@@ -820,9 +604,10 @@ class Main {
         }
         return jsonData
     }
+
     checkIconFileIsExists(jsonData) {
         const appDir = (env.getEnv('DESKTOP_APP_DIR') || file.readFile(gdir.getLocalInfoFile('appdir_info.ini'))).trim()
-         
+
         for (let index = 0; index < jsonData.length; index++) {
             const item = jsonData[index];
             const softwareList = item['softwareList'];
@@ -844,7 +629,7 @@ class Main {
                     if (!file.isAbsolute(exe_path)) {
                         exe_path = path.join(appDir, exe_path)
                         jsonData[index].softwareList[i].path = exe_path
-                    } 
+                    }
                     if (!file.isAbsolute(target)) {
                         target = path.join(appDir, target)
                         jsonData[index].softwareList[i].target = target

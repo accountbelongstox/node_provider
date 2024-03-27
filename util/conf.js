@@ -1,13 +1,15 @@
+const Base = require('../base/base');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
+const { gdir, env } = require('../globalvars');
 
-class Conf {
-    constructor(config_name="mainconf",config_sapce="dd_electron_userdata") {
+class Conf extends Base {
+    constructor(config_name = "mainconf", config_sapce = "dd_electron_userdata") {
+        super()
         const localAppDataPath = path.join(os.homedir(), 'AppData', 'Local');
         this.userDataDir = path.join(localAppDataPath, config_sapce);
-        //# 不存在则创建 this.userDataDir
         if (!fs.existsSync(this.userDataDir)) {
             try {
                 fs.mkdirSync(this.userDataDir, { recursive: true });
@@ -20,6 +22,159 @@ class Conf {
         this.config = this.load()
     }
 
+    //------------------------------ App Conf ------------------------------
+    allAppConf() {
+        return this.getAllAppConf()
+    }
+
+    getAllAppConf() {
+        const appConfName = this.getAppConfName();
+        const appDir = this.getAppDir();
+        if (!appConfName || !appDir) {
+            console.error(`Config file by (${appConfName}) not found`);
+            return {};
+        }
+        const configFilePath = path.join(appDir,appConfName,`config`, 'config.default.js');
+        if (!this.isFile(configFilePath)) {
+            this.copyDefaultConfFile()
+        }
+        if (this.isFile(configFilePath)) {
+            const config = require(configFilePath);
+            if (typeof config === 'function') {
+                return config();
+            } else {
+                return config;
+            }
+        }  else {
+            console.error(`Config file (${configFilePath}) not found`);
+            return {};
+        }
+    }
+
+    getAppConfDir(){
+        const appConfName = this.getAppConfName();
+        const appDir = this.getAppDir();
+        return path.join(appDir,appConfName,`config`);
+    }
+
+    getAllAppBinConf() {
+        const appConfName = this.getAppConfName();
+        const appDir = this.getAppDir();
+        if (!appConfName || !appDir) {
+            console.error(`Config file by (${appConfName})Bin not found`);
+            return {};
+        }
+        const configFilePath = path.join(appDir,appConfName,`config`, 'bin.js');
+        if (!this.isFile(configFilePath)) {
+            this.copyBinDefaultConfFile()
+        }
+        if (this.isFile(configFilePath)) {
+            const config = require(configFilePath);
+            if (typeof config === 'function') {
+                return config();
+            } else {
+                return config;
+            }
+        }  else {
+            console.error(`Config file (${configFilePath}) not found`);
+            return {};
+        }
+    }
+
+    getAppDir() {
+        return gdir.getRootDir('apps');
+    }
+
+    getEggConfDir(subDir){
+        let configDir = gdir.getRootDir('electron/config');
+        if(subDir){
+            configDir = path.join(configDir, subDir);
+        }
+        return configDir
+    }
+
+    copyDefaultConfFile(){
+        const eggConfigFilePath = this.getEggConfDir('config.default.js');
+        const appConfigDir = this.getAppConfDir();
+        const appConfigFilePath = path.join(appConfigDir, 'config.default.js');
+
+        this.copyFile(eggConfigFilePath, appConfigFilePath)
+    }
+
+    copyBinDefaultConfFile(){
+        const eggBinConfigFilePath = this.getEggConfDir('bin.js');
+        
+        const appConfigDir = this.getAppConfDir();
+        const appBinConfigFilePath = path.join(appConfigDir, 'bin.js');
+
+        this.copyFile(eggBinConfigFilePath, appBinConfigFilePath)
+    }
+
+    copyFile(source, destination) {
+        try {
+            const data = fs.readFileSync(source);
+            fs.writeFileSync(destination, data);
+            console.log(`File copied from ${source} to ${destination}`);
+        } catch (error) {
+            console.error(`Error copying file from ${source} to ${destination}: ${error.message}`);
+        }
+    }
+
+    isFile(configFilePath){
+        if (fs.existsSync(configFilePath) && fs.lstatSync(configFilePath).isFile()) {
+           return true
+        }
+        return false
+    }
+
+    getAppConfName() {
+        let appConfName = env.getEnv('DEFAULT_APP');
+        if (!appConfName) {
+            const systemParams = this.getArg(`appname`);
+            appConfName = systemParams.name;
+        }
+        if (!appConfName) {
+            console.error('Please provide the "appname" parameter in system arguments (e.g., appname= xxxx )');
+        }
+        return appConfName;
+    }
+
+    getArg(name) {
+        if (typeof name === 'number') {
+            name = name + 1;
+            if (process.argv.length > name) {
+                return process.argv[name];
+            } else {
+                return null;
+            }
+        }
+        for (let i = 0; i < this.commandLineArgs.length; i++) {
+            const arg = this.commandLineArgs[i];
+            const regex = new RegExp("^[-]*" + name + "(\$|=|-|:)");
+            console.log(`regex.test(arg)`, regex.test(arg), regex, arg)
+            if (regex.test(arg)) {
+                if (arg.includes(`${name}:`)) {
+                    return arg.split(":")[1];
+                } else if (arg === `--${name}` || arg === `-${name}` || arg.match(`^-{0,1}\\*{1}${name}`)) {
+                    if (i + 1 < this.commandLineArgs.length) {
+                        return this.commandLineArgs[i + 1];
+                    } else {
+                        return null;
+                    }
+                } else if (arg === name) {
+                    if (i + 1 < this.commandLineArgs.length && !this.commandLineArgs[i + 1].startsWith("-")) {
+                        return this.commandLineArgs[i + 1];
+                    } else {
+                        return "";
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    //-----------------------------------------------------------------------
+
     getValue(name, defaultConfigFile = null) {
         if (this.config.hasOwnProperty(name)) {
             return this.config[name];
@@ -30,7 +185,7 @@ class Conf {
             return null;
         }
     }
-    
+
     setValue(name, value, defaultConfigFile = null) {
         if (defaultConfigFile) {
             const config = this.load(defaultConfigFile);
@@ -41,7 +196,7 @@ class Conf {
             this.save();
         }
     }
-    
+
     load(file) {
         if (!file) file = this.JSONCONFFile;
         if (!fs.existsSync(file)) {
@@ -51,7 +206,7 @@ class Conf {
         try {
             const data = fs.readFileSync(file, 'utf-8');
             const jsonConf = JSON.parse(data);
-            console.log('Configuration file read successfully:', jsonConf);
+            console.log('Configuration:', file);
             return jsonConf;
         } catch (error) {
             console.error('Unable to read configuration file:', error.message);
@@ -70,7 +225,7 @@ class Conf {
     }
 
 
-    setInitConfig(file){
+    setInitConfig(file) {
         if (!file) file = this.JSONCONFFile;
         const defaultConfigFile = this.load(file)
         return defaultConfigFile
@@ -136,7 +291,7 @@ class Conf {
             return null;
         }
     }
-    
+
     setConfig(key, value) {
         this.config[key] = value;
         this.save();
@@ -172,7 +327,7 @@ class Conf {
             return defaultValue;
         }
     }
-    
+
 
     getConfigObject() {
         return { config: this.config };

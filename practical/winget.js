@@ -56,7 +56,7 @@ class Winget extends Base {
         if (silent) {
             command += ` --accept-package-agreements --location "${installDir}" --silent`;
         }
-
+        console.log(command,`command`)
         plattool.execCommand(command)
             .then((result) => {
                 console.log(`Software ${winget_id} installed successfully.`);
