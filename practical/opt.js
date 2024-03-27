@@ -152,7 +152,6 @@ class Options {
         return args;
     }
 
-
     getPCUserAgent() {
         if (this.defaultOptions.random_user_agent) {
             const userAgent = new UserAgent({ deviceCategory: 'desktop'/*platform: 'Win32'*/ });

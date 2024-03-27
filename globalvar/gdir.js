@@ -212,13 +212,13 @@ class Gdir extends Base {
         }
     }
     getLibraryByLinuxDir(subDir) {
-        const fullPath = this.getRelationRootDir(`base/library/linux/${subDir || ''}`);
-        console.log(`fullPath`,fullPath)
+        const cwd = path.join(__dirname, '../../');
+        const fullPath = path.join(cwd, `base/library/linux/${subDir || ''}`);
         return fullPath;
     }
     getLibraryByWin32Dir(subDir) {
-        const fullPath = this.getRelationRootDir(`base/library/win32/${subDir || ''}`);
-        console.log(`fullPath`,fullPath)
+        const cwd = path.join(__dirname, '../../');
+        const fullPath = path.join(cwd, `base/library/win32/${subDir || ''}`);
         return fullPath;
     }
     getStaticFile(subDir) {
