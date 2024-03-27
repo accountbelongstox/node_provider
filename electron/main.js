@@ -4,10 +4,11 @@ const Base = require('../base/base');
 // const Ps = require('ee-core/ps');
 const Log = require('ee-core/log');
 const path = require('path')
-const { tool, conf, json, file,urltool } = require('../utils.js');
+const { tool, conf, json, file,urltool, plattool, sysarg } = require('../utils.js');
 const { http, serve } = require('../practicals.js');
-const { env, gdir } = require('../globalvars.js');
+const { env, gdir,encyclopedia } = require('../globalvars.js');
 const { elec, ctrl, view, tray } = require('./egg_utils.js');
+const { exit } = require('process');
 const viewPreload = path.join(__dirname, './preload/view/index.js');
 let win = null;
 
@@ -120,6 +121,23 @@ class MountEgg extends Base {
 	}
 
 	async startWithWeb() {
+		const npm_lifecycle_event = process.env.npm_lifecycle_event
+		console.log(`npm_lifecycle_event`,npm_lifecycle_event)
+		if(npm_lifecycle_event != "dev"){
+			const eeCore = encyclopedia.getEncyclopedia(`eeCore`)
+			// node_modules\ee-bin\tools\serve.js
+			console.log()
+			const devConfig = appBinConfig.dev
+			const serveConfig = {
+				config:conf.getEggConfDir(`bin.js`,true)
+			}
+			
+			const serve = require('../../node_modules/ee-bin/tools/serve.js');
+			serve.dev(serveConfig);//this.opts()
+
+			console.dir(eeCore)
+			exit(0)
+		}
 		const frontendConf = appBinConfig.dev.frontend
 		const port = frontendConf.port
 		const hostname = frontendConf.hostname

@@ -32,7 +32,7 @@ class Gdir extends Base {
         return fullPath;
     }
     getRelationRootDir(subDir) {
-        const cwd = path.join(__dirname, '../');
+        const cwd = path.join(__dirname, '../../');
         const fullPath = subDir ? path.join(cwd, subDir) : cwd;
         if (fullPath && !fs.existsSync(fullPath)) {
             fs.mkdirSync(fullPath, { recursive: true });
@@ -53,7 +53,9 @@ class Gdir extends Base {
         return fullPath;
     }
     getRootDir(subDir) {
-        const fullPath = subDir ? path.join(process.cwd(), subDir) : process.cwd();
+        let cwd = this.getArg(`root`)
+        if(!cwd)cwd = this.getRelationRootDir()
+        const fullPath = subDir ? path.join(cwd, subDir) : cwd;
         if (fullPath && !fs.existsSync(fullPath)) {
             fs.mkdirSync(fullPath, { recursive: true });
         }
@@ -258,6 +260,40 @@ class Gdir extends Base {
         if (!fs.existsSync(dirPath)) {
             fs.mkdirSync(dirPath, { recursive: true });
         }
+    }
+    getArg(name) {
+        if (typeof name === 'number') {
+            name = name + 1;
+            if (process.argv.length > name) {
+                return process.argv[name];
+            } else {
+                return null;
+            }
+        }
+        for (let i = 0; i < process.argv.length; i++) {
+            const arg = process.argv[i];
+            const regex = new RegExp("^[-]*" + name + "(\$|=|-|:)");
+            if (regex.test(arg)) {
+                if (arg.includes(`${name}:`)) {
+                    return arg.split(":")[1];
+                }else if (arg.includes(`${name}=`)) {
+                    return arg.split("=")[1];
+                } else if (arg === `--${name}` || arg === `-${name}` || arg.match(`^-{0,1}\\*{1}${name}`)) {
+                    if (i + 1 < process.argv.length) {
+                        return process.argv[i + 1];
+                    } else {
+                        return null;
+                    }
+                } else if (arg === name) {
+                    if (i + 1 < process.argv.length && !process.argv[i + 1].startsWith("-")) {
+                        return process.argv[i + 1];
+                    } else {
+                        return "";
+                    }
+                }
+            }
+        }
+        return null;
     }
 }
 module.exports = new Gdir()

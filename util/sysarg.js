@@ -13,7 +13,7 @@ class SysArg {
         return this.platform;
     }
     
-    getArg(name) {
+    getArg(name,info=false) {
         if (typeof name === 'number') {
             name = name + 1;
             if (process.argv.length > name) {
@@ -22,22 +22,25 @@ class SysArg {
                 return null;
             }
         }
-        for (let i = 0; i < this.commandLineArgs.length; i++) {
-            const arg = this.commandLineArgs[i];
+        if(info)console.log(`getArg`)
+        if(info)console.log(process.argv)
+        for (let i = 0; i < process.argv.length; i++) {
+            const arg = process.argv[i];
             const regex = new RegExp("^[-]*" + name + "(\$|=|-|:)");
-            console.log(`regex.test(arg)`,regex.test(arg),regex,arg)
             if (regex.test(arg)) {
                 if (arg.includes(`${name}:`)) {
                     return arg.split(":")[1];
+                }else if (arg.includes(`${name}=`)) {
+                    return arg.split("=")[1];
                 } else if (arg === `--${name}` || arg === `-${name}` || arg.match(`^-{0,1}\\*{1}${name}`)) {
-                    if (i + 1 < this.commandLineArgs.length) {
-                        return this.commandLineArgs[i + 1];
+                    if (i + 1 < process.argv.length) {
+                        return process.argv[i + 1];
                     } else {
                         return null;
                     }
                 } else if (arg === name) {
-                    if (i + 1 < this.commandLineArgs.length && !this.commandLineArgs[i + 1].startsWith("-")) {
-                        return this.commandLineArgs[i + 1];
+                    if (i + 1 < process.argv.length && !process.argv[i + 1].startsWith("-")) {
+                        return process.argv[i + 1];
                     } else {
                         return "";
                     }

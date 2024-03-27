@@ -19,9 +19,16 @@ class ElectronInstance extends Base {
         const binConfig = conf.getAllAppBinConf()
         const devConfig = binConfig.dev
         const frontendConfig = devConfig.frontend
-        const frontendDirectory = devConfig.directory
+        let frontendDirectory = frontendConfig.directory
+        console.log(`devConfig`,devConfig)
+        console.log(`frontendDirectory`,frontendDirectory)
+        if(frontendDirectory.includes(`/`)){
+            frontendDirectory = frontendDirectory.split('/')
+            console.log(`frontendDirectory`,frontendDirectory)
+            frontendDirectory = frontendDirectory[frontendDirectory.length -1 ]
+        }
         const nodeByBinConfig = frontendConfig.node
-        getnode.getNpmByEnv(nodeByBinConfig).then(async (npmExec) => {
+        getnode.getNpmByConfig(nodeByBinConfig).then(async (npmExec) => {
             // npmExec = path.normalize(npmExec);
             const defaultConfig = conf.getEggConfDir('bin.js');
             const defaultConfigLines = file.readLines(defaultConfig)
@@ -58,6 +65,7 @@ class ElectronInstance extends Base {
             this.success( `File ${desktop_by_node_frontend_file} has been updated.`  )
             this.success( `File ${desktop_by_npm_frontend_file} has been updated.`  )
             this.success( `File ${desktop_by_yarn_frontend_file} has been updated.`  )
+            this.success( `File ${desktop_by_node_frontenddir_file} has been updated.`  )
             this.success(`The desktop front-end operating environment is ready.`)
             if (callback) callback()
         })
@@ -68,7 +76,7 @@ class ElectronInstance extends Base {
         const devConfig = binConfig.dev
         const frontendConfig = devConfig.frontend
         const nodeByBinConfig = frontendConfig.node
-        const npm_exe = await getnode.getNpmByEnv(nodeByBinConfig)
+        const npm_exe = await getnode.getNpmByConfig(nodeByBinConfig)
         const yarnExe = await getnode.getYarnByNodeVersion(nodeByBinConfig)
         const info =  {
             nodeVersion: process.version,

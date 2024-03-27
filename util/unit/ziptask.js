@@ -15,7 +15,7 @@ class ZipTask extends Base {
     execCountTasks = 0
     execTaskEvent = null
     zipQueueTokens = []
-
+ 
     constructor() {
         super()
     }

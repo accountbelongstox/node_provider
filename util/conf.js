@@ -34,7 +34,7 @@ class Conf extends Base {
             console.error(`Config file by (${appConfName}) not found`);
             return {};
         }
-        const configFilePath = path.join(appDir,appConfName,`config`, 'config.default.js');
+        const configFilePath = path.join(appDir, appConfName, `config`, 'config.default.js');
         if (!this.isFile(configFilePath)) {
             this.copyDefaultConfFile()
         }
@@ -45,16 +45,16 @@ class Conf extends Base {
             } else {
                 return config;
             }
-        }  else {
+        } else {
             console.error(`Config file (${configFilePath}) not found`);
             return {};
         }
     }
 
-    getAppConfDir(){
+    getAppConfDir() {
         const appConfName = this.getAppConfName();
         const appDir = this.getAppDir();
-        return path.join(appDir,appConfName,`config`);
+        return path.join(appDir, appConfName, `config`);
     }
 
     getAllAppBinConf() {
@@ -64,7 +64,7 @@ class Conf extends Base {
             console.error(`Config file by (${appConfName})Bin not found`);
             return {};
         }
-        const configFilePath = path.join(appDir,appConfName,`config`, 'bin.js');
+        const configFilePath = path.join(appDir, appConfName, `config`, 'bin.js');
         if (!this.isFile(configFilePath)) {
             this.copyBinDefaultConfFile()
         }
@@ -75,7 +75,7 @@ class Conf extends Base {
             } else {
                 return config;
             }
-        }  else {
+        } else {
             console.error(`Config file (${configFilePath}) not found`);
             return {};
         }
@@ -85,15 +85,16 @@ class Conf extends Base {
         return gdir.getRootDir('apps');
     }
 
-    getEggConfDir(subDir){
-        let configDir = gdir.getRootDir('electron/config');
-        if(subDir){
-            configDir = path.join(configDir, subDir);
+    getEggConfDir(subDir, relation = false) {
+        const relationDir = './electron/config'
+        let configDir = relation ? relationDir : gdir.getRootDir(relationDir);
+        if (subDir) {
+            configDir = configDir + `/` + subDir;
         }
         return configDir
     }
 
-    copyDefaultConfFile(){
+    copyDefaultConfFile() {
         const eggConfigFilePath = this.getEggConfDir('config.default.js');
         const appConfigDir = this.getAppConfDir();
         const appConfigFilePath = path.join(appConfigDir, 'config.default.js');
@@ -101,9 +102,9 @@ class Conf extends Base {
         this.copyFile(eggConfigFilePath, appConfigFilePath)
     }
 
-    copyBinDefaultConfFile(){
+    copyBinDefaultConfFile() {
         const eggBinConfigFilePath = this.getEggConfDir('bin.js');
-        
+
         const appConfigDir = this.getAppConfDir();
         const appBinConfigFilePath = path.join(appConfigDir, 'bin.js');
 
@@ -120,15 +121,18 @@ class Conf extends Base {
         }
     }
 
-    isFile(configFilePath){
+    isFile(configFilePath) {
         if (fs.existsSync(configFilePath) && fs.lstatSync(configFilePath).isFile()) {
-           return true
+            return true
         }
         return false
     }
 
     getAppConfName() {
-        let appConfName = env.getEnv('DEFAULT_APP');
+        let appConfName = this.getArg(`app`)
+        if (!appConfName) {
+            appConfName = env.getEnv('DEFAULT_APP');
+        }
         if (!appConfName) {
             const systemParams = this.getArg(`appname`);
             appConfName = systemParams.name;
@@ -148,22 +152,23 @@ class Conf extends Base {
                 return null;
             }
         }
-        for (let i = 0; i < this.commandLineArgs.length; i++) {
-            const arg = this.commandLineArgs[i];
+        for (let i = 0; i < process.argv.length; i++) {
+            const arg = process.argv[i];
             const regex = new RegExp("^[-]*" + name + "(\$|=|-|:)");
-            console.log(`regex.test(arg)`, regex.test(arg), regex, arg)
             if (regex.test(arg)) {
                 if (arg.includes(`${name}:`)) {
                     return arg.split(":")[1];
+                } else if (arg.includes(`${name}=`)) {
+                    return arg.split("=")[1];
                 } else if (arg === `--${name}` || arg === `-${name}` || arg.match(`^-{0,1}\\*{1}${name}`)) {
-                    if (i + 1 < this.commandLineArgs.length) {
-                        return this.commandLineArgs[i + 1];
+                    if (i + 1 < process.argv.length) {
+                        return process.argv[i + 1];
                     } else {
                         return null;
                     }
                 } else if (arg === name) {
-                    if (i + 1 < this.commandLineArgs.length && !this.commandLineArgs[i + 1].startsWith("-")) {
-                        return this.commandLineArgs[i + 1];
+                    if (i + 1 < process.argv.length && !process.argv[i + 1].startsWith("-")) {
+                        return process.argv[i + 1];
                     } else {
                         return "";
                     }

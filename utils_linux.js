@@ -32,7 +32,7 @@ module.exports = {
     platform,
     htmlparse,
     math:math_,
-    conf:conf,
+    conf,
     plattool,
     log,
     sysarg,

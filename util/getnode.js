@@ -8,7 +8,7 @@ const http = require('node:http');
 const readline = require('readline');
 const os = require('os');
 const { env } = require('../globalvars');
-const { ziptask } = require('./units');
+const { ziptask,conf } = require('./units');
 
 class Getnode extends Base {
     tmpDirName = `nodes_autoinstaller`
@@ -299,18 +299,18 @@ class Getnode extends Base {
             const [, major, minor] = version.split('.');
             const key = `${major}.${minor}`;
             if (!groups[key]) {
-              groups[key] = [];
+                groups[key] = [];
             }
             groups[key].push(version);
             return groups;
-          }, {});
-          
-          const groupsInfo = Object.values(groupedVersions).map(group => {
+        }, {});
+
+        const groupsInfo = Object.values(groupedVersions).map(group => {
             const firstVersion = group[0];
             const [, major, minor] = firstVersion.split('.');
             return `v${major}.${minor}.x (${group.length} versions)`;
-          });
-          return groupedVersions
+        });
+        return groupedVersions
     }
 
     async getLocalVersionsList() {
@@ -319,7 +319,7 @@ class Getnode extends Base {
 
         const versionPattern = /\bv(\d+\.\d+)\.\d+\b/g;
         const versionsList = Content.match(versionPattern);
-        if(!Array.isArray(versionsList)) {
+        if (!Array.isArray(versionsList)) {
             versionsList = []
         }
         return versionsList
@@ -649,8 +649,17 @@ class Getnode extends Base {
         return null
     }
 
-    async getNpmByEnv(node_version){
-        if(!node_version) node_version = env.getEnv(`FRONTEND_NODE`,`18`)
+    async getNpmByConfig(node_version) {
+        if (!node_version) {
+            const binConfig = conf.getAllAppBinConf()
+            const devConfig = binConfig.dev
+            const frontendConfig = devConfig.frontend
+            const frontendDirectory = devConfig.directory
+            node_version = frontendConfig.node
+        }
+        if(!node_version){
+            console.log(`not found node version by apps/Bin.config.js`)
+        }
         return await this.getNpmByNodeVersion(node_version)
     }
 
