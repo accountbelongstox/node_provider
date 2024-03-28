@@ -106,7 +106,6 @@ class Softinstall extends Base {
         }
     }
 
-
     async installationRulesBefore(software, progressCallback, callback) {
         const appDir = software.appDir;
         const target = software.target;
@@ -156,7 +155,7 @@ class Softinstall extends Base {
                 ['C:/Program Files/Google', 'Google'],
                 ['C:/Program Files (x86)/Google', 'Google/x86'],
             ]
-            this.linkToDirs(links, appDir, false)
+            this.linkToDirs(links, appDir, true)
         } else if (mainDirLow.startsWith('microsoft visual studio')) {
             const links = [
                 ['C:/CocosDashboard', 'CocosDashboard'],
@@ -206,7 +205,8 @@ class Softinstall extends Base {
                 if (!file.isAbsolute(src)) {
                     sourcePath = path.join(appDir, src);
                 }
-                if (!file.isSymbolicLink(sourcePath)) {
+                console.log(`isSymbolicLink`,targetPath,file.isSymbolicLink(targetPath))
+                if (!file.isSymbolicLink(targetPath)) {
                     file.symlinkSync(sourcePath, targetPath, force);
                     console.log(`Symbolic link created from ${sourcePath} to ${targetPath}`);
                 }
@@ -442,15 +442,31 @@ class Softinstall extends Base {
     deleteDesktopShortcuts(software) {
         const desktopPath = path.join(require('os').homedir(), 'Desktop');
         const shortcuts = fs.readdirSync(desktopPath).filter(file => file.endsWith('.lnk'));
+        const clearIcons = [
+            `Chrome Beta`,
+            `Chrome Dev`,
+            `Chrome Canary`,
+
+        ]
+        this.info(`clearDesktopShortcuts`)
+        this.info(`---------------------------------------`)
         shortcuts.forEach(async (shortcut) => {
             const shortcutPath = path.join(desktopPath, shortcut);
             const shortcutLinkInfo = await shoticon.parseLnkFile(shortcutPath);
             const target = shortcutLinkInfo.target;
-            console.log(target, software.target)
+            this.info(`\t desktop-target : ${target}`)
+            this.info(`\t software-target : ${software.target}`)
             if (fpath.equal(target, software.target)) {
                 file.delete(shortcutLinkInfo.linkPath)
+                this.success(`clear-Shortcuts : ${shortcutLinkInfo.linkPath}`)
+            }
+            const isDelete = clearIcons.some(item => target.includes(item));
+            if (isDelete) {
+                file.delete(shortcutLinkInfo.linkPath)
+                this.success(`clear-Shortcuts : ${shortcutLinkInfo.linkPath}`)
             }
         });
+        this.info(`---------------------------------------`)
     }
 
     clearDesktopShortcuts(software) {

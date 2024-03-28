@@ -251,6 +251,7 @@ class ZipTask extends Base {
                     let zipName = path.basename(zipPath)
                     if (!this.isFileLocked(zipPath)) {
                         this.log(`Unziping ${zipName}, background:${this.concurrentTasks}`, true);
+                        this.success(`Unzip-Command: ${command}`)
                         this.execCountTasks++
                         this.addToPendingTasks(command, (usetime) => {
                             this.log(`${zipName} Compressed.runtime: ${usetime / 1000}s`, true);
@@ -380,7 +381,7 @@ class ZipTask extends Base {
             command = this.createUnzipCommand(src, out)
         }
 
-        if (!this.isTask(zipPath)) {
+        if (!this.isTask(zipPath) && typeof zipPath  == "string") {
             let zipAct = isZip ? `compression` : `unzip`
             let zipName = path.basename(zipPath)
             this.log(`Add a ${zipAct} ${zipName}, background:${this.concurrentTasks}`, true);
@@ -391,6 +392,9 @@ class ZipTask extends Base {
                 isQueue,
                 processCallback
             })
+        }else{
+            if(processCallback)processCallback(-1)
+            if(callback)callback()
         }
         this.execTask()
     }

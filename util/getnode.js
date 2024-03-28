@@ -576,6 +576,8 @@ class Getnode extends Base {
     }
 
     installNodeAndYarn(nodePath, npmPath, nodeInstallFileDir) {
+        console.log(`Node.js version: ${nodePath}`);
+        console.log(`Npm version: ${npmPath}`);
         let nodeVersion = execSync(`${nodePath} -v`, { encoding: 'utf-8' });
         let npmVersion = execSync(`${npmPath} -v`, { encoding: 'utf-8' });
         console.log(`Node.js version: ${nodeVersion}`);

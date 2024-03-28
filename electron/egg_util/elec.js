@@ -37,9 +37,7 @@ class ElectronInstance extends Base {
             const searchString = 'npm';
             for (let i = 0; i < defaultConfigLines.length; i++) {
                 const items = defaultConfigLines[i].split('cmd:');
-                console.log(`items[1] ${items[1]}`)
                 if (items.length > 1 && items[1].includes(searchString)) {
-
                     console.log(`nodeByBinConfig ${nodeByBinConfig}`)
                     console.log(`npmExec ${npmExec}`)
                     npmOriginExe = items[1]

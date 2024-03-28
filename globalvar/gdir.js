@@ -212,12 +212,12 @@ class Gdir extends Base {
         }
     }
     getLibraryByLinuxDir(subDir) {
-        const cwd = path.join(__dirname, '../../');
+        const cwd = path.join(__dirname, '../');
         const fullPath = path.join(cwd, `base/library/linux/${subDir || ''}`);
         return fullPath;
     }
     getLibraryByWin32Dir(subDir) {
-        const cwd = path.join(__dirname, '../../');
+        const cwd = path.join(__dirname, '../');
         const fullPath = path.join(cwd, `base/library/win32/${subDir || ''}`);
         return fullPath;
     }
