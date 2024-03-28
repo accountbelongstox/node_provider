@@ -23,10 +23,10 @@ class Main {
     }
 
     async parseLnkFile(lnkFilePath) {
-        if(!file.isAbsolute(lnkFilePath)){
+        if (!file.isAbsolute(lnkFilePath)) {
             lnkFilePath = gdir.getDesktopFile(lnkFilePath)
         }
-        
+
         const basename = path.basename(lnkFilePath);
         if (this.iconParseLnkCache[basename]) {
             return this.iconParseLnkCache[basename];
@@ -43,15 +43,21 @@ class Main {
         }
     }
 
+    getPrimaryDisplay() {
+        const primaryDisplay = screen.getPrimaryDisplay();
+        const { width, height } = primaryDisplay.workAreaSize;
+        return { width, height }
+    }
+
     getIconWidth() {
-        let icon_width = parseInt(env.getEnv('DESKTOP_ICON_WIDTH', 50));
+        let icon_width = 50;
         try {
-            const primaryDisplay = screen.getPrimaryDisplay();
-            const { width, height } = primaryDisplay.workAreaSize;
+            const { width, height } = this.getPrimaryDisplay();
             if (width <= 1920) {
                 icon_width = 30
+            } else if (width <= 1920) {
+                icon_width = 30
             }
-            env.setEnv('DESKTOP_ICON_WIDTH', icon_width)
         } catch (e) {
             console.log(e)
         }
