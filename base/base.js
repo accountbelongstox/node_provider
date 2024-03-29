@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const Log = require('./log');
+const chalk = require('chalk');
 
 class Base extends Log {
     constructor() {
@@ -83,9 +84,8 @@ class Base extends Log {
     }
 
     warn(...args) {
-        const yellowColor = '\x1b[93m';
-        const noPrintValue = this.getEnv("NO_PRINT");
-        const show = !(noPrintValue && noPrintValue.toLowerCase() === "true");
+        const yellowColor = '\x1b[33m'; // 黄色
+        const show = this.shouldPrint();
         args.forEach(msg => {
             if (show) {
                 this._printFormatted(yellowColor, msg);
@@ -96,19 +96,19 @@ class Base extends Log {
     }
 
     error(...args) {
-        const redColor = '\x1b[91m';
-        const noPrintValue = this.getEnv("NO_PRINT");
-        const show = !(noPrintValue && noPrintValue.toLowerCase() === "true");
+        const redColor = '\x1b[31m'; // 红色
+        const show = this.shouldPrint();
         args.forEach(msg => {
             this._printFormatted(redColor, msg);
-            this.easyLog(msg, "error");
+            if (!show) {
+                this.easyLog(msg, "error");
+            }
         });
     }
 
     success(...args) {
-        const greenColor = '\x1b[92m';
-        const noPrintValue = this.getEnv("NO_PRINT");
-        const show = !(noPrintValue && noPrintValue.toLowerCase() === "true");
+        const greenColor = '\x1b[32m'; // 绿色
+        const show = this.shouldPrint();
         args.forEach(msg => {
             if (show) {
                 this._printFormatted(greenColor, msg);
@@ -119,9 +119,8 @@ class Base extends Log {
     }
 
     info(...args) {
-        const blueColor = '\x1b[94m';
-        const noPrintValue = this.getEnv("NO_PRINT");
-        const show = !(noPrintValue && noPrintValue.toLowerCase() === "true");
+        const blueColor = '\x1b[34m'; // 蓝色
+        const show = this.shouldPrint();
         args.forEach(msg => {
             if (show) {
                 this._printFormatted(blueColor, msg);
@@ -132,7 +131,7 @@ class Base extends Log {
     }
 
     infoLog(msg, logname) {
-        const blueColor = '\x1b[94m';
+        const blueColor = '\x1b[34m'; // 蓝色
         const show = this.shouldPrint();
         if (show) {
             this._printFormatted(blueColor, msg);
@@ -142,7 +141,7 @@ class Base extends Log {
     }
 
     successLog(msg, logname) {
-        const greenColor = '\x1b[32m';
+        const greenColor = '\x1b[32m'; // 绿色
         const show = this.shouldPrint();
         if (show) {
             this._printFormatted(greenColor, msg);
@@ -152,7 +151,7 @@ class Base extends Log {
     }
 
     warnLog(msg, logname) {
-        const yellowColor = '\x1b[33m';
+        const yellowColor = '\x1b[33m'; // 黄色
         const show = this.shouldPrint();
         if (show) {
             this._printFormatted(yellowColor, msg);
@@ -162,18 +161,13 @@ class Base extends Log {
     }
 
     errorLog(msg, logname) {
-        const redColor = '\x1b[31m';
+        const redColor = '\x1b[31m'; // 红色
         const show = this.shouldPrint();
         if (show) {
             this._printFormatted(redColor, msg);
         } else {
             this.easyLog(msg, "error", logname);
         }
-    }
-
-    shouldPrint() {
-        const noPrintValue = this.getEnv("NO_PRINT");
-        return !(noPrintValue && noPrintValue.toLowerCase() === "true");
     }
 
     _printFormatted(colorCode, msg) {
@@ -183,6 +177,11 @@ class Base extends Log {
         } else {
             console.log(`${colorCode}${msg}${endColor}`);
         }
+    }
+
+    shouldPrint() {
+        const noPrintValue = this.getEnv("NO_PRINT");
+        return !(noPrintValue && noPrintValue.toLowerCase() === "true");
     }
 }
 
