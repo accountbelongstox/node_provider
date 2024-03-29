@@ -287,7 +287,7 @@ class Softinstall extends Base {
             software.winget_id,
             '--location',
             installDir,
-            `--disable-interactivity`,
+            // `--disable-interactivity`,
             '--silent',
             '--force',
         ];
