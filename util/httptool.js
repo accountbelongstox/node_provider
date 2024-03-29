@@ -164,6 +164,10 @@ class Httptool extends Base {
                 dest = this.getDefaultDownloadFileDir(url);
             }
             const startTime = Date.now();
+            if(fs.existsSync(dest)){
+                resolve({ dest: dest, success: true, usetime: Date.now() - startTime });
+                return 
+            }
             const protocol = url.startsWith('https') ? https : http;
             const fileStream = fs.createWriteStream(dest);
             const req = protocol.get(url, res => {
