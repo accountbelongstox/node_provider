@@ -2,6 +2,7 @@ const { execSync, spawn, exec, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const Base = require('../base/base');
+const readline = require('readline');
 
 class Plattools extends Base {
     constructor() {
@@ -171,10 +172,10 @@ class Plattools extends Base {
         return resultText;
     }
 
-    async spawnAsync(command, info = true, cwd = null, logname = null, callback, timeout = 5000,progressCallback=null) {
+    async spawnAsync(command, info = true, cwd = null, logname = null, callback, timeout = 5000, progressCallback = null) {
         let cmd = '';
         let args = [];
-        if(typeof command === 'string'){
+        if (typeof command === 'string') {
             command = command.split(/\s+/)
         }
         if (Array.isArray(command)) {
@@ -184,7 +185,7 @@ class Plattools extends Base {
             cmd = command;
         }
         if (info) {
-            this.info(command);
+            console.log(command);
         }
         let timer = null;
         let callbackExecuted = false;
@@ -197,9 +198,7 @@ class Plattools extends Base {
                 process.chdir(cwd);
             }
             let childProcess;
-            childProcess = this.isLinux()
-                ? spawn('/bin/bash', ['-c', cmd].concat(args), options)
-                : spawn(cmd, args, options);
+            childProcess = spawn(cmd, args, options);
             let stdoutData = '';
             let stderrData = '';
             const resetTimer = () => {
@@ -208,38 +207,68 @@ class Plattools extends Base {
                 }
                 timer = setTimeout(() => {
                     if (!callbackExecuted) {
-                        if(callback)callback(this.wrapEmdResult(true, stdoutData, null, 0, info));
+                        if (callback) callback(this.wrapEmdResult(true, stdoutData, null, 0, info));
                         callbackExecuted = true;
                         // childProcess.kill(); 
                     }
                 }, timeout);
             };
-            childProcess.stdout.on('data', (data) => {
+            const rl = readline.createInterface({
+                input: process.stdin,
+                output: process.stdout
+            });
+
+            // 监听输出，如果遇到 (Y/N)，则输入 Y
+            const onOutput = (data) => {
+                const output = data.toString();
+                if (output.match(/(y\/n)/i)) {
+                    childProcess.stdin.write('Y\n');
+                }
                 resetTimer();
-                const output = this.byteToStr(data);
                 if (info) {
-                    this.info(output);
+                    console.log(output);
                 }
                 if (logname) {
-                    this.easyLog(output, logname);
+                    // this.easyLog(output, logname);
                 }
                 stdoutData += output + '\n';
-                // console.log(`stdout.on`,progressCallback)
-                progressCallback && progressCallback(stdoutData)
-            });
+                progressCallback && progressCallback(stdoutData);
+            };
+
+            // 监听输出，如果遇到 (Yes/No)，则输入 Yes
+            const onOutputYesNo = (data) => {
+                const output = data.toString();
+                if (output.match(/(yes\/no)/i)) {
+                    childProcess.stdin.write('Yes\n');
+                }
+                resetTimer();
+                if (info) {
+                    console.log(output);
+                }
+                if (logname) {
+                    // this.easyLog(output, logname);
+                }
+                stdoutData += output + '\n';
+                progressCallback && progressCallback(stdoutData);
+            };
+
+            childProcess.stdout.on('data', onOutput);
+            childProcess.stdout.on('data', onOutputYesNo);
+
             childProcess.stderr.on('data', (data) => {
                 resetTimer();
-                const error = this.byteToStr(data);
+                const error = data.toString();
                 if (info) {
-                    this.warn(error);
+                    console.warn(error);
                 }
                 stderrData += error + '\n';
-                progressCallback && progressCallback(stdoutData)
+                progressCallback && progressCallback(stdoutData);
             });
+
             childProcess.on('close', (code) => {
                 process.chdir(this.initialWorkingDirectory);
                 if (logname) {
-                    this.easyLog(stdoutData, logname);
+                    // this.easyLog(stdoutData, logname);
                 }
                 if (code === 0) {
                     resolve(this.wrapEmdResult(true, stdoutData, null, 0, info));
@@ -252,6 +281,7 @@ class Plattools extends Base {
                     );
                 }
             });
+
             childProcess.on('error', (err) => {
                 process.chdir(this.initialWorkingDirectory);
                 resolve(

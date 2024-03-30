@@ -12,6 +12,7 @@ class Softinstall extends Base {
     installSchedulingQueue = {}
     isQueueRunning = false;
     installation_socket_event_name = `installer`
+    installingSoftware = null
 
     constructor() {
         super();
@@ -40,8 +41,7 @@ class Softinstall extends Base {
         };
 
         const software = this.installQueue[basename];
-
-        this.installSchedulingQueue[basename] = {
+        const installingSoftware = {
             setProgress: (val, notify = true) => {
                 if (val === undefined) {
                     software.installingProgress = val
@@ -58,21 +58,31 @@ class Softinstall extends Base {
                 software.installingProgress = 100
                 if (notify) this.notifyBySocket(software, "install", `The installation has been completed and the installation was successful..`)
             },
-            fail: (msg=`The current installation status is failed...`,notify = true) => {
+            fail: (msg = `The current installation status is failed...`, notify = true) => {
                 software.installingProgress = -1
                 delete this.installSchedulingQueue[basename]
                 if (notify) this.notifyBySocket(software, "install", msg)
                 this.popInstallQueue()
             },
             done: (notify = true) => {
-                software.installingProgress = 100
                 delete this.installSchedulingQueue[basename]
                 software.isExist = file.isFile(software.target);
-                if (notify) this.notifyBySocket(software, "install", `The installation has been completed and the installation was successful..`)
-                this.popInstallQueue()
+                this.installationRulesAfter(installingSoftware, (success, message = `The installation has been completed and the installation was successful..`) => {
+                    software.installResultStatus = success
+                    if (success) {
+                        software.installingProgress = 100
+                    } else {
+                        software.installingProgress = -1
+                    }
+                    if (notify) this.notifyBySocket(software, "install", message)
+                    this.clearDesktopShortcuts(software)
+                    this.popInstallQueue()
+                })
             },
             ...softwareOrg
         };
+
+        this.installSchedulingQueue[basename] = installingSoftware
         this.notifyBySocket(software, "install", `Added ${basename} to the installation queue`)
 
         if (!this.isQueueRunning) {
@@ -97,6 +107,7 @@ class Softinstall extends Base {
             const keys = Object.keys(this.installQueue);
             const firstKey = keys[0];
             const software = this.installSchedulingQueue[firstKey];
+            this.installingSoftware = software
             delete this.installQueue[firstKey];
             const basename = software.basename;
             this.notifyBySocket(software, "install", `Added ${basename} to the installation queue`)
@@ -188,8 +199,28 @@ class Softinstall extends Base {
         }
     }
 
-    installationRulesAfter(software) {
-
+    async installationRulesAfter(software, callback) {
+        const basename = software.basename;
+        const target = software.target;
+        const mainDir = file.getLevelPath(target, 2);
+        const appDir = software.appDir;
+        let installResultStatus = true
+        let message = `The installation has been completed and the installation was successful..`
+        if (basename.includes(`eric`)) {
+            const installerPython = path.join(appDir, mainDir, 'install.py')
+            let pipUpdateCommand = `python -m pip install --upgrade pip`
+            let result = await plattool.spawnAsync(pipUpdateCommand, true, null, null, null, 50000, () => {
+                software.addProgress(92)
+            })
+            let installCommand = `python ${installerPython}`
+            console.log(result)
+            console.log(installerPython)
+            result = await plattool.spawnAsync(installCommand, true, null, null, null, 50000, () => {
+                software.addProgress(99)
+            })
+            console.log(result)
+        }
+        if (callback) callback(installResultStatus, message)
     }
 
     getShortcutTarget(shortcutPath) {
@@ -205,7 +236,7 @@ class Softinstall extends Base {
                 if (!file.isAbsolute(src)) {
                     sourcePath = path.join(appDir, src);
                 }
-                console.log(`isSymbolicLink`,targetPath,file.isSymbolicLink(targetPath))
+                console.log(`isSymbolicLink`, targetPath, file.isSymbolicLink(targetPath))
                 if (!file.isSymbolicLink(targetPath)) {
                     file.symlinkSync(sourcePath, targetPath, force);
                     console.log(`Symbolic link created from ${sourcePath} to ${targetPath}`);
@@ -229,17 +260,6 @@ class Softinstall extends Base {
             const softwareZipName = `${mainDir}.zip`
             const downloadUrl = gdir.getLocalStaticApiUrl(`${applications}/${softwareZipName}`);
             return downloadUrl
-        }
-    }
-
-    installProgressProcess(progress, readyDownload, downloading, message, installProgress, progressCallback, callback) {
-        if (progress == -1) {
-            if (progressCallback) progressCallback(-1, message)
-            if (callback) callback();
-            return
-        } else {
-            installProgress.value = progress / 3
-            if (progressCallback) progressCallback(installProgress.value)
         }
     }
 
@@ -297,7 +317,6 @@ class Softinstall extends Base {
         }
         const stdOjb = await plattool.spawnAsync(installCommand, true, null, null, null, 50000, progressCallback)
         software.done(stdOjb);
-        this.clearDesktopShortcuts(software)
         return stdOjb
     }
 
@@ -313,17 +332,18 @@ class Softinstall extends Base {
             software.addProgress(30)
         }
         const zipProgressCallback = () => {
-            software.addProgress(99)
+            software.addProgress(90)
         }
         if (!fs.existsSync(target)) {
             const softwareZipName = `${mainDir}.zip`
             const downloadUrl = gdir.getLocalStaticApiUrl(`${applications}/${softwareZipName}`);
             const destDir = path.join(download, softwareZipName);
-            const localFilePath = await httptool.downloadFile(downloadUrl, destDir, downloadProgressCallback);
+
+            const localFilePath = await httptool.downloadFile(downloadUrl, destDir, downloadProgressCallback,true);
             if (localFilePath && localFilePath.dest) {
                 const dest = localFilePath.dest
                 const timer = setInterval(() => {
-                    if (intervalProgress < 99) {
+                    if (intervalProgress < 90) {
                         intervalProgress++;
                         zipProgressCallback()
                     } else {
@@ -382,24 +402,24 @@ class Softinstall extends Base {
                     }, zipProgressCallback);
                 }
             }
-        }else{
+        } else {
             software.fail()
         }
     }
 
     async seartchInstallerAndRun(software, unzipDir) {
-        if(software.startClickInstaller){
-            return 
+        if (software.startClickInstaller) {
+            return
         }
-        if(!software.startClickInstaller){
+        if (!software.startClickInstaller) {
             software.startClickInstaller = true
         }
         let intervalProgress = 0;
         const timerStart = () => {
             const timer = setInterval(() => {
-                if (intervalProgress < 99) {
+                if (intervalProgress < 90) {
                     intervalProgress++;
-                    software.addProgress(99)
+                    software.addProgress(90)
                 } else {
                     software.done()
                     if (timer) clearInterval(timer);
@@ -436,7 +456,7 @@ class Softinstall extends Base {
         } else {
             return { error: { code: 'UNSUPPORTED_INSTALL_METHOD', message: 'Unsupported installation method' } };
         }
-        this.installationRulesAfter()
+        // await this.installationRulesAfter(software) modify to done.
     }
 
     deleteDesktopShortcuts(software) {
@@ -489,6 +509,9 @@ class Softinstall extends Base {
         setTimeout(() => {
             this.deleteDesktopShortcuts(software)
         }, 5000);
+        setTimeout(() => {
+            this.deleteDesktopShortcuts(software)
+        }, 15000);
     }
 }
 

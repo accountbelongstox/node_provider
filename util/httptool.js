@@ -157,14 +157,14 @@ class Httptool extends Base {
         let compare = await this.compareFileSizes(remoteUrl, localPath)
         return compare
     }
-    downloadFile(url, dest, progressCallback) {
+    downloadFile(url, dest, progressCallback,force=true) {
         let lastCallbackTime = 0;
         return new Promise((resolve, reject) => {
             if (!dest) {
                 dest = this.getDefaultDownloadFileDir(url);
             }
             const startTime = Date.now();
-            if(fs.existsSync(dest)){
+            if(fs.existsSync(dest) && !force){
                 resolve({ dest: dest, success: true, usetime: Date.now() - startTime });
                 return 
             }
