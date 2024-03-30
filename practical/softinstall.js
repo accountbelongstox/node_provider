@@ -442,7 +442,11 @@ class Softinstall extends Base {
         // const software_library = 'softlist/static_src/software_library/';
         // const installProgress = { value: 0 };
         // const download = gdir.getCustomTempDir('Downloads');
-        this.installationRulesBefore(software)
+        try{
+            this.installationRulesBefore(software)
+        }catch(e){
+            this.error(e)
+        }
         if (software.winget_id) {
             await this.installByWingetId(software)
         } else if (
@@ -495,10 +499,28 @@ class Softinstall extends Base {
         shortcuts.forEach(async (shortcut) => {
             const shortcutPath = path.join(desktopPath, shortcut);
             const shortcutLinkInfo = await shoticon.parseLnkFile(shortcutPath);
-            const target = shortcutLinkInfo.target;
-            if (fpath.equal(target, software.target)) {
+            let target = shortcutLinkInfo.target;
+            if(!target)target = ``
+            target = path.normalize(target).toLowerCase();
+            let appDir = shortcutLinkInfo.appDir;
+            if(!appDir)appDir = ``
+            appDir = path.normalize(appDir).toLowerCase();
+            let softAppDir = software.appDir;
+            if(!softAppDir)softAppDir = ``
+            softAppDir = path.normalize(softAppDir).toLowerCase();
+            let softTarget = software.target
+            if(!softTarget)softTarget = ``
+            softTarget = path.normalize(softTarget).toLowerCase();
+            if (fpath.equal(target, softTarget)) {
                 file.delete(shortcutLinkInfo.linkPath)
             }
+            let installDir = file.removePathFrom(softTarget,softAppDir)
+            installDir = path.normalize(installDir).toLowerCase()
+            if(target.endsWith(installDir)){
+                file.delete(shortcutLinkInfo.linkPath)
+            }
+            console.log(`installDir`,installDir)
+            console.log(`target`,target)
         });
         setTimeout(() => {
             this.deleteDesktopShortcuts(software)

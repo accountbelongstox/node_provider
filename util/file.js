@@ -1796,6 +1796,20 @@ class File extends Base {
         }
         return subdirectoryCount === 1;
     }
+
+    removePathFrom(pathA, pathB) {
+        const partsA = pathA.split(/[\/\\]/);
+        const partsB = pathB.split(/[\/\\]/);
+    
+        const compareIgnoreCase = (str1, str2) => str1.toLowerCase() === str2.toLowerCase();
+    
+        let index = 0;
+        while (index < partsA.length && index < partsB.length && compareIgnoreCase(partsA[index], partsB[index])) {
+            index++;
+        }
+        const remainingPartsB = partsB.slice(index);
+        return remainingPartsB.join('/');
+    }
 }
 File.toString = () => '[class File]';
 module.exports = new File();
