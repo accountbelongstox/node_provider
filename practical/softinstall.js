@@ -167,6 +167,12 @@ class Softinstall extends Base {
                 ['C:/Program Files (x86)/Google', 'Google/x86'],
             ]
             this.linkToDirs(links, appDir, true)
+        } else if (mainDirLow.startsWith('oray')) {
+            const links = [
+                ['C:/Program Files/Oray', 'Oray'],
+                ['C:/Program Files (x86)/Oray', 'Oray/Oray_x86'],
+            ]
+            this.linkToDirs(links, appDir, true)
         } else if (mainDirLow.startsWith('microsoft visual studio')) {
             const links = [
                 ['C:/CocosDashboard', 'CocosDashboard'],
@@ -220,6 +226,9 @@ class Softinstall extends Base {
             })
             console.log(result)
         }
+        // else if(basename.includes(`eric`)){
+
+        // }
         if (callback) callback(installResultStatus, message)
     }
 
