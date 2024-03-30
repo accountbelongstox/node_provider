@@ -205,33 +205,6 @@ class Softinstall extends Base {
         }
     }
 
-    async installationRulesAfter(software, callback) {
-        const basename = software.basename;
-        const target = software.target;
-        const mainDir = file.getLevelPath(target, 2);
-        const appDir = software.appDir;
-        let installResultStatus = true
-        let message = `The installation has been completed and the installation was successful..`
-        if (basename.includes(`eric`)) {
-            const installerPython = path.join(appDir, mainDir, 'install.py')
-            let pipUpdateCommand = `python -m pip install --upgrade pip`
-            let result = await plattool.spawnAsync(pipUpdateCommand, true, null, null, null, 50000, () => {
-                software.addProgress(92)
-            })
-            let installCommand = `python ${installerPython}`
-            console.log(result)
-            console.log(installerPython)
-            result = await plattool.spawnAsync(installCommand, true, null, null, null, 50000, () => {
-                software.addProgress(99)
-            })
-            console.log(result)
-        }
-        // else if(basename.includes(`eric`)){
-
-        // }
-        if (callback) callback(installResultStatus, message)
-    }
-
     getShortcutTarget(shortcutPath) {
         const result = execSync(`powershell -Command "(New-Object -ComObject WScript.Shell).CreateShortcut('${shortcutPath}').TargetPath"`).toString().trim();
         return result;
@@ -469,7 +442,35 @@ class Softinstall extends Base {
         } else {
             return { error: { code: 'UNSUPPORTED_INSTALL_METHOD', message: 'Unsupported installation method' } };
         }
-        // await this.installationRulesAfter(software) modify to done.
+    }
+
+    async installationRulesAfter(software, callback) {
+        const basename = software.basename;
+        const target = software.target;
+        const mainDir = file.getLevelPath(target, 2);
+        const appDir = software.appDir;
+        let installResultStatus = !!target
+        let message = `The installation has been completed and the installation was successful..`
+        if (basename.includes(`eric`)) {
+            const installerPython = path.join(appDir, mainDir, 'install.py')
+            let pipUpdateCommand = `python -m pip install --upgrade pip`
+            let result = await plattool.spawnAsync(pipUpdateCommand, true, null, null, null, 50000, () => {
+                software.addProgress(92)
+            })
+            let installCommand = `python ${installerPython}`
+            console.log(result)
+            console.log(installerPython)
+            result = await plattool.spawnAsync(installCommand, true, null, null, null, 50000, () => {
+                software.addProgress(99)
+            })
+            console.log(result)
+        }
+        else if(basename.includes(`oray`)){
+            if(target){
+                await plattool.runAsAdmin(target)
+            }
+        }
+        if (callback) callback(installResultStatus, message)
     }
 
     deleteDesktopShortcuts(software) {
