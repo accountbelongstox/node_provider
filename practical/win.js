@@ -7,6 +7,7 @@ const { execSync, exec } = require('child_process');
 let config = {};
 const { file, tool, strtool, plattool } = require('../utils');
 const { gdir } = require('../globalvars');
+// const windows_shortcuts = require('windows-shortcuts');
 
 class Win {
     pathKey = 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment'
@@ -189,23 +190,30 @@ class Win {
             if (callback) callback(err, std)
         });
     }
+
     async runAsAdmin(file_path, callback) {
         file_path = path.normalize(file_path);
+        const originalCwd = process.cwd();
         let cmd;
         let result;
+        const baseDir = path.dirname(file_path);
+        const exename = path.basename(file_path)
         if (!fs.existsSync(file_path)) {
-            const baseDir = path.dirname(file_path);
             cmd = `explorer "${baseDir}"`;
             result = { error: 'Executable file does not exist. Opening the parent directory of the executable file.' };
             console.error(result.error);
         } else {
-            cmd = `explorer "${file_path}"`;
+            process.chdir(baseDir);
+            cmd = `start ${file_path}`;
+            console.log(`runAsAdmin: ${cmd}`)
             result = await plattool.execCommand(cmd, true);
         }
+        process.chdir(originalCwd);
         if (callback) {
             callback(result);
         }
     }
+
     runAsAdminByGSudo(file_path, group, default_config, pare = '', callback) {
         console.log(`file_path`, file_path)
         file_path = path.normalize(file_path)
@@ -239,6 +247,7 @@ class Win {
             if (callback) callback(rData)
         }, 3000);
     }
+
 
     isHyperVEnabled(callback) {
         tool.exec_cmd('dism /online /get-featureinfo /featurename:Microsoft-Hyper-V', (stdout, error, stderr) => {
@@ -302,12 +311,12 @@ class Win {
         return hasWSL2
     }
 
-    async installWsl2(){
+    async installWsl2() {
         let upCmd = `wsl --update`
         let result = await plattool.execByCommand(upCmd)
         console.log(result)
         let setDefaultCmd = `wsl --set-default-version 2`
-         result = await plattool.execByCommand(setDefaultCmd)
+        result = await plattool.execByCommand(setDefaultCmd)
         console.log(result)
     }
 
