@@ -8,22 +8,37 @@ class Base extends Log {
         super()
     }
 
-    getCwd(filename = null, suffix = "") {
+    getCwd = (suffix = "") => {
         let cwd;
-        if (filename === null) {
-            let mainFilePath = path.resolve(process.argv[1]);
-            if (fs.existsSync(mainFilePath) && fs.statSync(mainFilePath).isFile()) {
-                mainFilePath = path.dirname(mainFilePath)
-            }
-            cwd = mainFilePath;
+        let mainFilePath;
+        // Check if process.argv has only one item
+        if (process.argv.length === 1) {
+            mainFilePath = process.argv[0]; // Get the only item in process.argv
         } else {
-            cwd = path.dirname(filename);
+            mainFilePath = path.resolve(process.argv[1]);
         }
-        if (suffix !== "") {
-            cwd = path.join(cwd, suffix);
+
+        // Check if the file exists and is a file
+        if (fs.existsSync(mainFilePath) && fs.statSync(mainFilePath).isFile()) {
+            // If it's an .exe file, get its directory
+            if (path.extname(mainFilePath).toLowerCase() === '.exe') {
+                mainFilePath = path.join(path.dirname(mainFilePath),`resources/app`);
+            } else {
+                mainFilePath = path.dirname(mainFilePath);
+            }
         }
+        cwd = mainFilePath;
+    
+        if (suffix !== "" && typeof suffix === 'string') {
+            if( path.isAbsolute(suffix)){
+                cwd = suffix;
+            }else{
+                cwd = path.join(cwd, suffix);
+            }
+        }
+        cwd = cwd.replace(/\\/g, "/");
         return cwd;
-    }
+    };
 
     getEnvFile() {
         return path.join(this.getCwd(), ".env");

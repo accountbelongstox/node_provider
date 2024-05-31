@@ -14,8 +14,9 @@ const { getnode } = require('../utils.js');
 // const distDir = path.join(appRoot, indexDir)
 const http = require('http');
 const { strtool, urltool, file,plattool, setenv,env } = require('../utils.js');
+const Base = require('../base/base');
 
-class Pm2 {
+class Pm2 extends Base  {
     httpPort = 18000
 
     constructor() {
@@ -42,7 +43,7 @@ class Pm2 {
         const env_FRONTEND_NODE = env.getEnv(`FRONTEND_NODE`)
         const env_FRONTEND = env.getEnv(`FRONTEND`)
         if(!yarn)yarn = setenv.where(`yarn`)
-        const currentDir = process.cwd();
+        const currentDir = this.getCwd();
         const frontendDir = file.resolvePath(frontend);
         
         console.log(`env_FRONTEND_NODE`,env_FRONTEND_NODE)

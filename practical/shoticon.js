@@ -626,7 +626,7 @@ class Main {
                 let exe_path = softwareItem.path;
                 jsonData[index].softwareList[i].appDir = appDir
                 jsonData[index].softwareList[i].icon_width = this.getIconWidth()
-
+                
                 if (appDir) {
                     if (!file.isAbsolute(iconPath)) {
                         iconPath = path.join(appDir, iconPath)
@@ -641,7 +641,9 @@ class Main {
                         jsonData[index].softwareList[i].target = target
                     }
                 }
-
+                if(target){
+                    jsonData[index].softwareList[i].mainDir = file.getLevelPath(target,2)
+                }
                 if (file.isAbsolute(jsonData[index].softwareList[i].target)) {
                     jsonData[index].softwareList[i].isExist = file.isFile(jsonData[index].softwareList[i].target)
                 }

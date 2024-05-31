@@ -13,7 +13,7 @@ class Env extends Base {
 
     constructor(rootDir = null, envName = '.env', delimiter = '=') {
         super();
-        this.rootDir = rootDir || process.cwd();
+        this.rootDir = rootDir || this.getCwd();
         this.envName = envName;
         this.delimiter = delimiter;
     }

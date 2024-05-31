@@ -7,21 +7,40 @@ const Base = require('../base/base');
 // const indexDir = "." + path.dirname(mainServer.indexPath)
 // const distDir = path.join(appRoot, indexDir)
 const http = require('http');
+const serveHandler = require('serve-handler');
 const { env } = require('../globalvars.js');
-const { strtool, urltool, file, plattool, getnode,porttool } = require('../utils.js');
+const { strtool, urltool, file, plattool, getnode, porttool } = require('../utils.js');
 const { type } = require('os');
 let electronShell = null
 
 class Serve extends Base {
     httpPort = 18000
-    currentDir = process.cwd();
+    currentDir = this.getCwd();
     constructor() {
         super()
     }
-    startVue(port = 23350, distDir = "dist") {
-        const handler = require('serve-handler');
+
+    startServer(directory, port = 3000) {
+        port = parseInt(port)
+        directory = this.getCwd(directory)
         const server = http.createServer((request, response) => {
-            return handler(request, response, {
+            return serveHandler(request, response, {
+                "public": directory,
+                cleanUrls:true,
+                renderSingle:true,
+            });
+        });
+
+        server.listen(port, () => {
+            console.log(`Running at http://localhost:${port}`);
+            console.log(`\t Dist-Dir ${directory}`);
+        });
+    }
+
+
+    startVue(port = 23350, distDir = "dist") {
+        const server = http.createServer((request, response) => {
+            return serveHandler(request, response, {
                 "public": distDir
             });
         });
@@ -29,6 +48,7 @@ class Serve extends Base {
             console.log(`Running at http://localhost:${port}`);
         });
     }
+
     async startFrontend(frontend, frontend_command, node_version = `18`, callback) {
         const frontend_port = env.getEnv(`FRONTEND_PORT`)
         const frontendDir = file.resolvePath(frontend);
@@ -69,7 +89,7 @@ class Serve extends Base {
             plattool.spawnAsync(start_command, true, frontendDir, null, callback)
         } else {
             this.info(`The front-end server is started and the port ${frontend_port} is occupied.`)
-            if(callback)callback(null)
+            if (callback) callback(null)
         }
     }
     async runByNpm(frontendDir, frontend_command, node_version = '18', callback) {
@@ -131,14 +151,14 @@ class Serve extends Base {
         process.chdir(this.currentDir);
         return resultString
     }
-    
+
     getFrontendServerUrl() {
         const frontend_port = env.getEnv(`FRONTEND_PORT`)
         return `http://localhost:${frontend_port}`
     }
 
     openFrontendServerUrl(openUrl) {
-        if(typeof openUrl === 'object' && openUrl.protocol && openUrl.hostname && openUrl.port){
+        if (typeof openUrl === 'object' && openUrl.protocol && openUrl.hostname && openUrl.port) {
             const protocol = openUrl.protocol
             const hostname = openUrl.hostname
             const port = openUrl.port
@@ -146,13 +166,13 @@ class Serve extends Base {
         }
         if (!openUrl) openUrl = this.getFrontendServerUrl()
         openUrl = urltool.toOpenUrl(openUrl)
-        try{
-            if(!electronShell){
+        try {
+            if (!electronShell) {
                 const { shell } = require('electron');
                 electronShell = shell
             }
             electronShell.openExternal(openUrl);
-        }catch(e){
+        } catch (e) {
             console.log(e)
         }
     }

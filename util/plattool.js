@@ -7,8 +7,8 @@ const readline = require('readline');
 class Plattools extends Base {
     constructor() {
         super();
-        this.initialWorkingDirectory = process.cwd();
-        this.currentDir = process.cwd();
+        this.initialWorkingDirectory = this.getCwd();
+        this.currentDir = this.getCwd();
     }
 
     async cmd(command, info = false, cwd = null, logname = null) {

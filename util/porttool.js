@@ -5,7 +5,7 @@ const net = require('net');
 class Porttool extends Base {
     constructor() {
         super();
-        this.currentDir = process.cwd();
+        this.currentDir = this.getCwd();
     }
 
     isWindows() {

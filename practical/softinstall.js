@@ -5,6 +5,7 @@ const { gdir } = require('../globalvars.js');
 const Base = require('../base/base.js');
 const { httptool, zip, file, plattool, strtool, fpath } = require('../utils.js');
 const { execSync } = require('child_process');
+const os = require('os')
 const shoticon = require('./shoticon.js');
 
 class Softinstall extends Base {
@@ -191,6 +192,13 @@ class Softinstall extends Base {
                 ['C:/ProgramData/Microsoft Visual Studio', 'MicrosoftVisualStudio_ProgramData']
             ]
             this.linkToDirs(links, appDir)
+        } else if (mainDirLow.startsWith('nero')) {
+            const links = [
+                [gdir.getUserProfileDir('AppData/Local/Google'), 'Google'],
+                ['C:/Program Files/Google', 'Google'],
+                ['C:/Program Files (x86)/Google', 'Google/x86'],
+            ]
+            this.linkToDirs(links, appDir, true)
         } else {
             isBeforeRule = false
         }
@@ -265,6 +273,9 @@ class Softinstall extends Base {
 
     searchInstallerExe(dir) {
         if (fs.existsSync(dir)) {
+            if (dir.endsWith('.exe')) {
+                return dir
+            }
             const stats = fs.statSync(dir);
             if (stats.isFile()) {
                 dir = path.dirname(dir);
@@ -339,7 +350,7 @@ class Softinstall extends Base {
             const downloadUrl = gdir.getLocalStaticApiUrl(`${applications}/${softwareZipName}`);
             const destDir = path.join(download, softwareZipName);
 
-            const localFilePath = await httptool.downloadFile(downloadUrl, destDir, downloadProgressCallback,true);
+            const localFilePath = await httptool.downloadFile(downloadUrl, destDir, downloadProgressCallback, true);
             if (localFilePath && localFilePath.dest) {
                 const dest = localFilePath.dest
                 const timer = setInterval(() => {
@@ -397,9 +408,13 @@ class Softinstall extends Base {
                 if (fs.existsSync(unzipDir)) {
                     await this.seartchInstallerAndRun(software, unzipDir)
                 } else {
-                    zip.putUnZipTask(dest, unzipDir, async () => {
-                        await this.seartchInstallerAndRun(software, unzipDir)
-                    }, zipProgressCallback);
+                    if (file.isCompressedFile(dest)) {
+                        zip.putUnZipTask(dest, unzipDir, async () => {
+                            await this.seartchInstallerAndRun(software, unzipDir)
+                        }, zipProgressCallback);
+                    } else {
+                        await this.seartchInstallerAndRun(software, dest)
+                    }
                 }
             }
         } else {
@@ -426,7 +441,9 @@ class Softinstall extends Base {
                 }
             }, 1000);
         }
+        console.log(`unzipDir`, unzipDir)
         let installerExe = this.searchInstallerExe(unzipDir)
+        console.log(`installerExe`, installerExe)
         await plattool.runAsAdmin(installerExe, (progress, message) => {
             timerStart()
         });
@@ -442,9 +459,9 @@ class Softinstall extends Base {
         // const software_library = 'softlist/static_src/software_library/';
         // const installProgress = { value: 0 };
         // const download = gdir.getCustomTempDir('Downloads');
-        try{
+        try {
             this.installationRulesBefore(software)
-        }catch(e){
+        } catch (e) {
             this.error(e)
         }
         if (software.winget_id) {
@@ -464,7 +481,7 @@ class Softinstall extends Base {
     }
 
     deleteDesktopShortcuts(software) {
-        const desktopPath = path.join(require('os').homedir(), 'Desktop');
+        const desktopPath = path.join(os.homedir(), 'Desktop');
         const shortcuts = fs.readdirSync(desktopPath).filter(file => file.endsWith('.lnk'));
         const clearIcons = [
             `Chrome Beta`,
@@ -494,33 +511,37 @@ class Softinstall extends Base {
     }
 
     clearDesktopShortcuts(software) {
-        const desktopPath = path.join(require('os').homedir(), 'Desktop');
+        const desktopPath = path.join(os.homedir(), 'Desktop');
+        if(!fs.existsSync(desktopPath)){
+            console.log(`clearDesktopShortcuts : ${desktopPath} is not exists`)
+            return 
+        }
         const shortcuts = fs.readdirSync(desktopPath).filter(file => file.endsWith('.lnk'));
         shortcuts.forEach(async (shortcut) => {
             const shortcutPath = path.join(desktopPath, shortcut);
             const shortcutLinkInfo = await shoticon.parseLnkFile(shortcutPath);
             let target = shortcutLinkInfo.target;
-            if(!target)target = ``
+            if (!target) target = ``
             target = path.normalize(target).toLowerCase();
             let appDir = shortcutLinkInfo.appDir;
-            if(!appDir)appDir = ``
+            if (!appDir) appDir = ``
             appDir = path.normalize(appDir).toLowerCase();
             let softAppDir = software.appDir;
-            if(!softAppDir)softAppDir = ``
+            if (!softAppDir) softAppDir = ``
             softAppDir = path.normalize(softAppDir).toLowerCase();
             let softTarget = software.target
-            if(!softTarget)softTarget = ``
+            if (!softTarget) softTarget = ``
             softTarget = path.normalize(softTarget).toLowerCase();
             if (fpath.equal(target, softTarget)) {
                 file.delete(shortcutLinkInfo.linkPath)
             }
-            let installDir = file.removePathFrom(softTarget,softAppDir)
+            let installDir = file.removePathFrom(softTarget, softAppDir)
             installDir = path.normalize(installDir).toLowerCase()
-            if(target.endsWith(installDir)){
+            if (target.endsWith(installDir)) {
                 file.delete(shortcutLinkInfo.linkPath)
             }
-            console.log(`installDir`,installDir)
-            console.log(`target`,target)
+            console.log(`installDir`, installDir)
+            console.log(`target`, target)
         });
         setTimeout(() => {
             this.deleteDesktopShortcuts(software)

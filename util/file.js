@@ -205,7 +205,7 @@ class File extends Base {
     }
 
     getPublic(fpath) {
-        const cwd = process.cwd();
+        const cwd = this.getCwd();
         const publicPath = path.join(cwd, 'public');
         if (!fs.existsSync(publicPath)) {
             fs.mkdirSync(publicPath, { recursive: true });
@@ -329,7 +329,7 @@ class File extends Base {
 
     findInParentDirectories(filename, currentDir) {
         if (!currentDir) {
-            currentDir = process.cwd();
+            currentDir = this.getCwd();
         }
         let filePath = path.join(currentDir, filename);
         if (fs.existsSync(filePath)) {
@@ -351,7 +351,7 @@ class File extends Base {
 
     get_path(filename, mkdir = true) {
         if (!path.isAbsolute(filename)) {
-            filename = path.join(process.cwd(), filename);
+            filename = path.join(this.getCwd(), filename);
         }
         let basedir = path.dirname(filename)
         if (mkdir) this.mkdir(basedir)
@@ -856,7 +856,7 @@ class File extends Base {
     }
 
     get_root(filename) {
-        let root = process.cwd();
+        let root = this.getCwd();
         if (filename) {
             root = path.join(root, filename)
         }
@@ -908,7 +908,7 @@ class File extends Base {
             return normalizedP;
         }
         const joinedPath = path.join(normalizedA, normalizedP);
-        const relativePath = path.relative(process.cwd(), joinedPath);
+        const relativePath = path.relative(this.getCwd(), joinedPath);
         if (!relativePath.startsWith('..')) {
             return relativePath;
         }

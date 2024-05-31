@@ -4,9 +4,9 @@ const Base = require('../base/base');
 // const Ps = require('ee-core/ps');
 const Log = require('ee-core/log');
 const path = require('path')
-const { tool, conf, json, file,urltool, plattool, sysarg } = require('../utils.js');
+const { tool, conf, json, file, urltool, plattool, sysarg } = require('../utils.js');
 const { http, serve } = require('../practicals.js');
-const { env, gdir,encyclopedia } = require('../globalvars.js');
+const { env, gdir, encyclopedia } = require('../globalvars.js');
 const { elec, ctrl, view, tray } = require('./egg_utils.js');
 const { exit } = require('process');
 const viewPreload = path.join(__dirname, './preload/view/index.js');
@@ -28,7 +28,7 @@ class MountEgg extends Base {
 	constructor() {
 		super()
 	}
-	
+
 	//modify
 
 	async start() {
@@ -122,36 +122,39 @@ class MountEgg extends Base {
 
 	async startWithWeb() {
 		const npm_lifecycle_event = process.env.npm_lifecycle_event
-		console.log(`npm_lifecycle_event`,npm_lifecycle_event)
-		if(npm_lifecycle_event != "dev"){
-			const eeCore = encyclopedia.getEncyclopedia(`eeCore`)
-			// node_modules\ee-bin\tools\serve.js
-			console.log()
-			const devConfig = appBinConfig.dev
-			const serveConfig = {
-				config:conf.getEggConfDir(`bin.js`,true)
-			}
-			
-			const serve = require('../../node_modules/ee-bin/tools/serve.js');
-			serve.dev(serveConfig);//this.opts()
-
-			console.dir(eeCore)
-			exit(0)
-		}
+		console.log(`npm_lifecycle_event`, npm_lifecycle_event)
 		const frontendConf = appBinConfig.dev.frontend
 		const port = frontendConf.port
 		const hostname = frontendConf.hostname
 		const protocol = frontendConf.protocol
-		// const node_version = frontendConf.node
+
+		if (npm_lifecycle_event != "dev") {
+			const eeCore = encyclopedia.getEncyclopedia(`eeCore`)
+			// node_modules\ee-bin\tools\serve.js
+			const binConfigFile = conf.getEggConfDir(`bin.js`, true)
+			const serveConfig = {
+				config: binConfigFile
+			}
+			const servePath = path.join(__dirname, '../../node_modules/ee-bin/tools/serve.js');
+			if (file.isFile(servePath)) {
+				const eggServe = require('../../node_modules/ee-bin/tools/serve.js');
+				eggServe.dev(serveConfig);
+			} else {
+				const binConfigFileByRoot = this.getCwd(binConfigFile)
+				const binConfig = require(binConfigFileByRoot)
+				const dist = this.getCwd( binConfig?.rd?.target ? binConfig?.rd?.target : './public/dist')
+				serve.startServer(dist,port)
+			}
+		}
+
 		this.trayCreate()
 		setTimeout(() => {
 			serve.openFrontendServerUrl({
 				protocol,
 				hostname,
 				port
-	
 			})
-		},1500)
+		}, 1500)
 		return
 		// const frontend_node = env.getEnv('FRONTEND_NODE', `18`)
 		// let frontend_command = MainConf.frontendConfig.frontend_command
