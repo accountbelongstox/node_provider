@@ -1,0 +1,204 @@
+const fs = require('fs');
+const path = require('path');
+const Log = require('./log');
+const chalk = require('chalk');
+
+class Base extends Log {
+    constructor() {
+        super()
+    }
+
+    getCwd = (suffix = "") => {
+        let cwd;
+        let mainFilePath;
+        // Check if process.argv has only one item
+        if (process.argv.length === 1) {
+            mainFilePath = process.argv[0]; // Get the only item in process.argv
+        } else {
+            mainFilePath = path.resolve(process.argv[1]);
+        }
+
+        // Check if the file exists and is a file
+        if (fs.existsSync(mainFilePath) && fs.statSync(mainFilePath).isFile()) {
+            // If it's an .exe file, get its directory
+            if (path.extname(mainFilePath).toLowerCase() === '.exe') {
+                mainFilePath = path.join(path.dirname(mainFilePath),`resources/app`);
+            } else {
+                mainFilePath = path.dirname(mainFilePath);
+            }
+        }
+        cwd = mainFilePath;
+    
+        if (suffix !== "" && typeof suffix === 'string') {
+            if( path.isAbsolute(suffix)){
+                cwd = suffix;
+            }else{
+                cwd = path.join(cwd, suffix);
+            }
+        }
+        cwd = cwd.replace(/\\/g, "/");
+        return cwd;
+    };
+
+    getEnvFile() {
+        return path.join(this.getCwd(), ".env");
+    }
+
+    readEnv() {
+        const filePath = this.getEnvFile();
+        let lines = [];
+        if (fs.existsSync(filePath)) {
+            lines = fs.readFileSync(filePath, 'utf-8').split('\n');
+        }
+        const result = lines.map(line => line.split('=').map(value => value.trim()));
+        return result;
+    }
+
+    saveEnv(envArr) {
+        const filteredEnvArr = envArr.filter(subarr => subarr.length === 2);
+        const formattedLines = filteredEnvArr.map(subarr => `${subarr[0]}=${subarr[1]}`);
+        const resultString = formattedLines.join('\n');
+        const envFilePath = this.getEnvFile();
+        try {
+            fs.writeFileSync(envFilePath, resultString, 'utf-8');
+        } catch (e) {
+            console.log(`Base-Class: Error saving environment variables: ${e}`);
+        }
+    }
+
+    setEnv(key, value) {
+        const envArr = this.readEnv();
+        let keyExists = false;
+        for (const subarr of envArr) {
+            if (subarr[0] === key) {
+                subarr[1] = value;
+                keyExists = true;
+                break;
+            }
+        }
+        if (!keyExists) {
+            envArr.push([key, value]);
+        }
+        this.saveEnv(envArr);
+    }
+
+    isEnv(key) {
+        const val = this.getEnv(key);
+        return val !== "";
+    }
+
+    getEnv(key) {
+        const envArr = this.readEnv();
+        const subarr = envArr.find(entry => entry[0] === key);
+        return subarr ? subarr[1] : "";
+    }
+
+    easyLog(logText, logType = "info", logfilename = null, maxTotalSizeMb = 500, maxfile = 5, cwd) {
+        if (!cwd) cwd = this.getCwd()
+        this.writeLog(logText, logType, maxTotalSizeMb, logfilename, maxfile, cwd)
+    }
+
+    warn(...args) {
+        const yellowColor = '\x1b[33m'; // 黄色
+        const show = this.shouldPrint();
+        args.forEach(msg => {
+            if (show) {
+                this._printFormatted(yellowColor, msg);
+            } else {
+                this.easyLog(msg, "warn");
+            }
+        });
+    }
+
+    error(...args) {
+        const redColor = '\x1b[31m'; // 红色
+        const show = this.shouldPrint();
+        args.forEach(msg => {
+            this._printFormatted(redColor, msg);
+            if (!show) {
+                this.easyLog(msg, "error");
+            }
+        });
+    }
+
+    success(...args) {
+        const greenColor = '\x1b[32m'; // 绿色
+        const show = this.shouldPrint();
+        args.forEach(msg => {
+            if (show) {
+                this._printFormatted(greenColor, msg);
+            } else {
+                this.easyLog(msg, "success");
+            }
+        });
+    }
+
+    info(...args) {
+        const blueColor = '\x1b[34m'; // 蓝色
+        const show = this.shouldPrint();
+        args.forEach(msg => {
+            if (show) {
+                this._printFormatted(blueColor, msg);
+            } else {
+                this.easyLog(msg, "info");
+            }
+        });
+    }
+
+    infoLog(msg, logname) {
+        const blueColor = '\x1b[34m'; // 蓝色
+        const show = this.shouldPrint();
+        if (show) {
+            this._printFormatted(blueColor, msg);
+        } else {
+            this.easyLog(msg, "info", logname);
+        }
+    }
+
+    successLog(msg, logname) {
+        const greenColor = '\x1b[32m'; // 绿色
+        const show = this.shouldPrint();
+        if (show) {
+            this._printFormatted(greenColor, msg);
+        } else {
+            this.easyLog(msg, "success", logname);
+        }
+    }
+
+    warnLog(msg, logname) {
+        const yellowColor = '\x1b[33m'; // 黄色
+        const show = this.shouldPrint();
+        if (show) {
+            this._printFormatted(yellowColor, msg);
+        } else {
+            this.easyLog(msg, "warn", logname);
+        }
+    }
+
+    errorLog(msg, logname) {
+        const redColor = '\x1b[31m'; // 红色
+        const show = this.shouldPrint();
+        if (show) {
+            this._printFormatted(redColor, msg);
+        } else {
+            this.easyLog(msg, "error", logname);
+        }
+    }
+
+    _printFormatted(colorCode, msg) {
+        const endColor = '\x1b[0m';
+        if (msg instanceof Object) {
+            console.log(JSON.stringify(msg, null, 2));
+        } else {
+            console.log(`${colorCode}${msg}${endColor}`);
+        }
+    }
+
+    shouldPrint() {
+        const noPrintValue = this.getEnv("NO_PRINT");
+        return !(noPrintValue && noPrintValue.toLowerCase() === "true");
+    }
+}
+
+Base.toString = () => '[class Base]';
+module.exports = Base;
